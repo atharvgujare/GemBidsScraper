@@ -1,0 +1,13 @@
+{
+  "pdf_folder": "pdfFolder",
+  "ministry": "Ministry of Defence",
+  "pages_per_run": 50,
+  "download_workers": 64,
+  "parse_workers": 12,
+  "verbose": false,
+  "schedule_times": [
+    "09:00",
+    "21:00"
+  ],
+  "schedule_enabled": false
+}

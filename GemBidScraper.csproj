@@ -1,0 +1,67 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="EFCore.NamingConventions" Version="9.0.0" />
+		<PackageReference Include="itext7" Version="9.7.0" />
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.17" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.10" />
+		<PackageReference Include="Microsoft.Playwright" Version="1.61.0" />
+		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.1" />
+		<PackageReference Include="PdfPig" Version="0.1.15" />
+		<PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Folder Include="Helpers\" />
+		<Folder Include="Logs\" />
+		<Folder Include="MigrationSql\" />
+	</ItemGroup>
+
+	<!--
+    Publish the Python API source/configuration files,
+    but do NOT copy the laptop's Python virtual environment
+    or Python cache files to the server.
+  -->
+
+	<ItemGroup>
+
+		<!-- Remove default SDK inclusion -->
+		<None Remove="PdfParserApi\**" />
+		<Content Remove="PdfParserApi\**" />
+
+		<!-- Publish Python source/config files, but exclude venv and cache -->
+		<Content Include="PdfParserApi\**"
+				 Exclude="PdfParserApi\venv\**;
+                    PdfParserApi\__pycache__\**">
+
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+
+		</Content>
+
+		<!--
+    Keep the local Python venv available during Debug/Run,
+    but NEVER include it in the published server package.
+  -->
+		<Content Include="PdfParserApi\venv\**">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Never</CopyToPublishDirectory>
+		</Content>
+
+	</ItemGroup>
+
+</Project>
