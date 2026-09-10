@@ -1,5 +1,4 @@
-﻿
-using GemBidScraper.Data;
+﻿using GemBidScraper.Data;
 using GemBidScraper.GeMBIdMapper;
 using GemBidScraper.Models;
 using GemBidScraper.Services.CategoryClassification;
@@ -41,6 +40,7 @@ namespace GemBidScraper.Services
             _categoryClassifier = categoryClassifier;
         }
 
+
         // ---------------------------------------------------------
         // FIX TIME FORMAT
         // ---------------------------------------------------------
@@ -57,6 +57,7 @@ namespace GemBidScraper.Services
                 RegexOptions.IgnoreCase);
         }
 
+
         // ---------------------------------------------------------
         // PARSE ONLINE
         // ---------------------------------------------------------
@@ -65,21 +66,29 @@ namespace GemBidScraper.Services
             int pages,
             string ministry = "Ministry of Defence")
         {
+            var runStopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
 
-            var runStopwatch = System.Diagnostics.Stopwatch.StartNew();
-            //--------------------------------------------------
-            // Get known active bids
-            //--------------------------------------------------
 
-            var knownBidNumbers =
-                await GetKnownActiveBidNumbersAsync();
+            // =====================================================
+            // GET KNOWN ACTIVE/RECENT BID INFORMATION
+            // =====================================================
+
+            var knownBidInfo =
+                await GetKnownActiveBidInfoAsync();
+
+
+            // =====================================================
+            // REQUEST PAYLOAD
+            // =====================================================
 
             var requestPayload = new
             {
                 Pages = pages,
                 Ministry = ministry,
-                KnownBidNumbers = knownBidNumbers
+                KnownBidInfo = knownBidInfo
             };
+
 
             Console.WriteLine("==========================================");
             Console.WriteLine("[C#] Calling Python API");
@@ -87,57 +96,76 @@ namespace GemBidScraper.Services
             Console.WriteLine("[C#] Endpoint: extract-online-pages");
             Console.WriteLine($"[C#] Pages: {pages}");
             Console.WriteLine($"[C#] Ministry: {ministry}");
-            Console.WriteLine($"[C#] Known bids: {knownBidNumbers.Count}");
+            Console.WriteLine($"[C#] Known bids: {knownBidInfo.Count}");
             Console.WriteLine("==========================================");
+
+
+            // =====================================================
+            // CALL PYTHON
+            // =====================================================
 
             var response = await _httpClient.PostAsJsonAsync(
                 "extract-online-pages",
                 requestPayload);
 
+
             Console.WriteLine("==========================================");
             Console.WriteLine(
-                $"[C#] Python response: {(int)response.StatusCode} {response.StatusCode}");
+                $"[C#] Python response: " +
+                $"{(int)response.StatusCode} {response.StatusCode}");
             Console.WriteLine("==========================================");
+
 
             if (!response.IsSuccessStatusCode)
             {
-                var error = await response.Content.ReadAsStringAsync();
+                var error =
+                    await response.Content.ReadAsStringAsync();
 
                 throw new Exception(
                     $"Python API Error ({response.StatusCode}) : {error}");
             }
 
-            //--------------------------------------------------
-            // Deserialize Response
-            //--------------------------------------------------
+
+            // =====================================================
+            // DESERIALIZE RESPONSE
+            // =====================================================
 
             var json =
                 await response.Content.ReadAsStringAsync();
 
+
             Console.WriteLine(
                 $"[Parser] Received {json.Length:N0} bytes from Python API.");
+
 
             var options = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             };
 
+
             var apiResponse =
                 JsonSerializer.Deserialize<PythonApiResponse>(
                     json,
                     options);
 
+
             Console.WriteLine(
-                $"[Parser] Result count: {apiResponse?.Result?.Count ?? 0}");
+                $"[Parser] Result count: " +
+                $"{apiResponse?.Result?.Count ?? 0}");
+
 
             Console.WriteLine("[Parser] JSON preview:");
+
 
             Console.WriteLine(
                 json.Substring(
                     0,
                     Math.Min(json.Length, 2000)));
 
+
             List<GeMBidExtract> bids = new();
+
 
             if (apiResponse == null ||
                 apiResponse.Result == null ||
@@ -149,15 +177,18 @@ namespace GemBidScraper.Services
                 return bids;
             }
 
-            //--------------------------------------------------
+
+            // =====================================================
             // JSON -> MODEL MAPPING
-            //--------------------------------------------------
+            // =====================================================
 
             var mappedBids =
                 new ConcurrentBag<GeMBidExtract>();
 
+
             var mappingErrors =
                 new ConcurrentBag<(string PdfUrl, string Error)>();
+
 
             Parallel.ForEach(
                 apiResponse.Result,
@@ -174,20 +205,22 @@ namespace GemBidScraper.Services
                     if (!item.Data.EnumerateObject().Any())
                         return;
 
+
                     try
                     {
-                        //--------------------------------------------------
+                        // =========================================
                         // MAP PDF DATA
-                        //--------------------------------------------------
+                        // =========================================
 
                         var bid =
                             GeMBidMapper_2.Map<GeMBidExtract>(
                                 item.PdfUrl,
                                 item.Data);
 
-                        //--------------------------------------------------
+
+                        // =========================================
                         // BASIC CARD DATA
-                        //--------------------------------------------------
+                        // =========================================
 
                         bid.BidNumber =
                             item.BidNumber;
@@ -195,9 +228,10 @@ namespace GemBidScraper.Services
                         bid.CardItemName =
                             item.ItemName;
 
-                        //--------------------------------------------------
+
+                        // =========================================
                         // MINISTRY
-                        //--------------------------------------------------
+                        // =========================================
 
                         if (!string.IsNullOrWhiteSpace(item.Ministry))
                         {
@@ -213,9 +247,10 @@ namespace GemBidScraper.Services
                                 minProp.GetString();
                         }
 
-                        //--------------------------------------------------
+
+                        // =========================================
                         // DEPARTMENT
-                        //--------------------------------------------------
+                        // =========================================
 
                         if (!string.IsNullOrWhiteSpace(item.Department))
                         {
@@ -231,9 +266,10 @@ namespace GemBidScraper.Services
                                 deptProp.GetString();
                         }
 
-                        //--------------------------------------------------
+
+                        // =========================================
                         // QUANTITY
-                        //--------------------------------------------------
+                        // =========================================
 
                         if (int.TryParse(
                             item.Quantity,
@@ -256,18 +292,13 @@ namespace GemBidScraper.Services
                             }
                         }
 
+
                         // ==================================================
                         // CARD START / END DATE
                         // ==================================================
-                        //
+
                         // These values come from the GeM card/search
                         // response, NOT from the PDF.
-                        //
-                        // We intentionally use DateTime.TryParse instead
-                        // of one strict TryParseExact format because the
-                        // GeM response can return slightly different
-                        // date/time representations.
-                        // ==================================================
 
                         item.StartDate =
                             FixTime(item.StartDate);
@@ -275,18 +306,20 @@ namespace GemBidScraper.Services
                         item.EndDate =
                             FixTime(item.EndDate);
 
-                        //--------------------------------------------------
+
+                        // =========================================
                         // LOG RAW CARD DATES
-                        //--------------------------------------------------
+                        // =========================================
 
                         Console.WriteLine(
                             $"[CARD DATE] Bid: {item.BidNumber} | " +
                             $"Start: '{item.StartDate}' | " +
                             $"End: '{item.EndDate}'");
 
-                        //--------------------------------------------------
+
+                        // =========================================
                         // CARD START DATE
-                        //--------------------------------------------------
+                        // =========================================
 
                         if (DateTime.TryParse(
                             item.StartDate,
@@ -304,13 +337,15 @@ namespace GemBidScraper.Services
                         else
                         {
                             Console.WriteLine(
-                                $"[CARD START FAILED] Bid: {item.BidNumber} | " +
+                                $"[CARD START FAILED] Bid: " +
+                                $"{item.BidNumber} | " +
                                 $"Value: '{item.StartDate}'");
                         }
 
-                        //--------------------------------------------------
+
+                        // =========================================
                         // CARD END DATE
-                        //--------------------------------------------------
+                        // =========================================
 
                         if (DateTime.TryParse(
                             item.EndDate,
@@ -328,13 +363,15 @@ namespace GemBidScraper.Services
                         else
                         {
                             Console.WriteLine(
-                                $"[CARD END FAILED] Bid: {item.BidNumber} | " +
+                                $"[CARD END FAILED] Bid: " +
+                                $"{item.BidNumber} | " +
                                 $"Value: '{item.EndDate}'");
                         }
 
-                        //--------------------------------------------------
+
+                        // =========================================
                         // ADD MAPPED BID
-                        //--------------------------------------------------
+                        // =========================================
 
                         mappedBids.Add(bid);
                     }
@@ -348,21 +385,25 @@ namespace GemBidScraper.Services
                     }
                 });
 
-            //--------------------------------------------------
+
+            // =====================================================
             // DISPLAY MAPPING ERRORS
-            //--------------------------------------------------
+            // =====================================================
 
             foreach (var (pdfUrl, error) in mappingErrors)
             {
                 Console.WriteLine("------------------------------------");
+
                 Console.WriteLine(
                     $"Mapping Failed : {pdfUrl}");
 
                 Console.WriteLine(error);
             }
 
+
             bids =
                 mappedBids.ToList();
+
 
             if (bids.Count == 0)
             {
@@ -372,9 +413,10 @@ namespace GemBidScraper.Services
                 return bids;
             }
 
-            //--------------------------------------------------
-            // DEDUPLICATE AGAINST DATABASE
-            //--------------------------------------------------
+
+            // =====================================================
+            // FIND EXISTING DATABASE RECORDS
+            // =====================================================
 
             var incomingBidNumbers =
                 bids
@@ -386,25 +428,33 @@ namespace GemBidScraper.Services
                     .Distinct()
                     .ToList();
 
-            var existingBidNumbers =
-                await GetExistingBidNumbersAsync(
+
+            var existingRecords =
+                await GetExistingBidRecordsAsync(
                     incomingBidNumbers);
 
+
+            // =====================================================
+            // INSERT / UPDATE CLASSIFICATION
+            // =====================================================
+
             List<GeMBidExtract> newRecords = new();
+
+            List<GeMBidExtract> updatedRecords = new();
+
 
             foreach (var bid in bids)
             {
                 if (string.IsNullOrWhiteSpace(
                     bid.BidNumber))
+                {
                     continue;
+                }
 
-                if (existingBidNumbers.Contains(
-                    bid.BidNumber))
-                    continue;
 
-                //--------------------------------------------------
+                // =================================================
                 // CATEGORY CLASSIFICATION
-                //--------------------------------------------------
+                // =================================================
 
                 var category =
                     _categoryClassifier.Classify(
@@ -415,62 +465,160 @@ namespace GemBidScraper.Services
                         $"{bid.ItemCategory} " +
                         $"{bid.Specification}");
 
+
                 bid.CategoryKey =
                     category.CategoryKey;
 
                 bid.CategorySubKey =
                     category.CategorySubKey;
 
-                //--------------------------------------------------
-                // ADD NEW RECORD
-                //--------------------------------------------------
 
-                newRecords.Add(bid);
+                // =================================================
+                // NEW BID
+                // =================================================
 
-                existingBidNumbers.Add(
-                    bid.BidNumber);
+                if (!existingRecords.TryGetValue(
+                    bid.BidNumber,
+                    out var existing))
+                {
+                    newRecords.Add(bid);
+
+                    continue;
+                }
+
+
+                // =================================================
+                // EXISTING BID
+                //
+                // Python only sends NEW + CHANGED bids.
+                //
+                // Therefore an existing record here means the bid
+                // needs to be refreshed.
+                // =================================================
+
+                var existingCreatedOn =
+                    existing.CreatedOn;
+
+
+                // Copy the newly parsed scalar values onto the
+                // tracked database entity, but NEVER copy the
+                // primary key. EF Core does not allow a primary
+                // key value to be modified.
+                //
+                // CreatedOn is also intentionally preserved so that
+                // an update does not make an existing record look
+                // newly created.
+
+                var existingEntry =
+                    _context.Entry(existing);
+
+                foreach (var property in existingEntry.Metadata.GetProperties())
+                {
+                    if (property.IsPrimaryKey() ||
+                        property.Name == nameof(GeMBidExtract.CreatedOn))
+                    {
+                        continue;
+                    }
+
+                    var propertyInfo =
+                        property.PropertyInfo;
+
+                    if (propertyInfo == null ||
+                        !propertyInfo.CanRead ||
+                        !propertyInfo.CanWrite)
+                    {
+                        continue;
+                    }
+
+                    propertyInfo.SetValue(
+                        existing,
+                        propertyInfo.GetValue(bid));
+                }
+
+
+                // -------------------------------------------------
+                // PRESERVE ORIGINAL CREATION TIME
+                // -------------------------------------------------
+
+                existing.CreatedOn =
+                    existingCreatedOn;
+
+
+                updatedRecords.Add(existing);
             }
 
-            //--------------------------------------------------
-            // NOTHING NEW
-            //--------------------------------------------------
 
-            if (newRecords.Count == 0)
+            // =====================================================
+            // NOTHING TO SAVE
+            // =====================================================
+
+            if (newRecords.Count == 0 &&
+                updatedRecords.Count == 0)
             {
                 Console.WriteLine(
-                    "No new bids found.");
+                    "No records to insert or update.");
 
-                return newRecords;
+                return bids;
             }
 
-            //--------------------------------------------------
-            // SAVE
-            //--------------------------------------------------
 
-            await SaveInBatchesAsync(
-    newRecords);
+            // =====================================================
+            // SAVE NEW RECORDS
+            // =====================================================
+
+            if (newRecords.Count > 0)
+            {
+                await SaveNewRecordsInBatchesAsync(
+                    newRecords);
+            }
+
+
+            // =====================================================
+            // SAVE UPDATED RECORDS
+            // =====================================================
+
+            if (updatedRecords.Count > 0)
+            {
+                await SaveUpdatedRecordsInBatchesAsync(
+                    updatedRecords);
+            }
+
 
             runStopwatch.Stop();
 
+
             Console.WriteLine("------------------------------------");
             Console.WriteLine("[SCRAPE TIMING]");
-            Console.WriteLine($"Total Run Time : {runStopwatch.Elapsed:hh\\:mm\\:ss\\.fff}");
-            Console.WriteLine($"New Bids       : {newRecords.Count:N0}");
+            Console.WriteLine(
+                $"Total Run Time : " +
+                $"{runStopwatch.Elapsed:hh\\:mm\\:ss\\.fff}");
+
+            Console.WriteLine(
+                $"New Bids       : " +
+                $"{newRecords.Count:N0}");
+
+            Console.WriteLine(
+                $"Updated Bids   : " +
+                $"{updatedRecords.Count:N0}");
+
             Console.WriteLine("------------------------------------");
 
-            return newRecords;
+
+            return bids;
         }
 
+
         // ---------------------------------------------------------
-        // GET KNOWN ACTIVE BID NUMBERS
+        // GET KNOWN ACTIVE/RECENT BID INFORMATION
         // ---------------------------------------------------------
 
-        private async Task<List<string>>
-            GetKnownActiveBidNumbersAsync()
+        private async Task<Dictionary<string, DateTime?>>
+            GetKnownActiveBidInfoAsync()
         {
             var cutoff =
                 DateTime.Now.AddDays(
                     -KnownBidLookbackBufferDays);
+
 
             return await _context.GeMBidExtracts
                 .AsNoTracking()
@@ -480,24 +628,27 @@ namespace GemBidScraper.Services
                         x.CardEndDate == null ||
                         x.CardEndDate >= cutoff
                     ))
-                .Select(x =>
-                    x.BidNumber!)
-                .ToListAsync();
+                .ToDictionaryAsync(
+                    x => x.BidNumber!,
+                    x => x.CardEndDate);
         }
 
+
         // ---------------------------------------------------------
-        // GET EXISTING BID NUMBERS
+        // GET EXISTING BID RECORDS
         // ---------------------------------------------------------
 
-        private async Task<HashSet<string>>
-            GetExistingBidNumbersAsync(
+        private async Task<Dictionary<string, GeMBidExtract>>
+            GetExistingBidRecordsAsync(
                 List<string> bidNumbers)
         {
             var existing =
-                new HashSet<string>();
+                new Dictionary<string, GeMBidExtract>();
+
 
             if (bidNumbers.Count == 0)
                 return existing;
+
 
             for (
                 int i = 0;
@@ -510,38 +661,49 @@ namespace GemBidScraper.Services
                         .Take(ExistenceCheckChunkSize)
                         .ToList();
 
+
                 var found =
                     await _context.GeMBidExtracts
-                        .AsNoTracking()
                         .Where(x =>
                             chunk.Contains(
                                 x.BidNumber!))
-                        .Select(x =>
-                            x.BidNumber!)
                         .ToListAsync();
 
-                foreach (var f in found)
-                    existing.Add(f);
+
+                foreach (var bid in found)
+                {
+                    if (!string.IsNullOrWhiteSpace(
+                        bid.BidNumber))
+                    {
+                        existing[bid.BidNumber] =
+                            bid;
+                    }
+                }
             }
+
 
             return existing;
         }
 
+
         // ---------------------------------------------------------
-        // SAVE IN BATCHES
+        // SAVE NEW RECORDS IN BATCHES
         // ---------------------------------------------------------
 
-        private async Task SaveInBatchesAsync(
+        private async Task SaveNewRecordsInBatchesAsync(
             List<GeMBidExtract> newRecords)
         {
             var strategy =
                 _context.Database
                     .CreateExecutionStrategy();
 
+
             var failedBids =
                 new List<(string BidNumber, string Error)>();
 
+
             int totalSaved = 0;
+
 
             for (
                 int i = 0;
@@ -554,6 +716,7 @@ namespace GemBidScraper.Services
                         .Take(BatchSize)
                         .ToList();
 
+
                 bool batchSucceeded =
                     await strategy.ExecuteAsync(
                         async () =>
@@ -562,16 +725,20 @@ namespace GemBidScraper.Services
                                 await _context.Database
                                     .BeginTransactionAsync();
 
+
                             try
                             {
                                 _context.GeMBidExtracts
                                     .AddRange(batch);
 
+
                                 await _context
                                     .SaveChangesAsync();
 
+
                                 await transaction
                                     .CommitAsync();
+
 
                                 return true;
                             }
@@ -580,44 +747,52 @@ namespace GemBidScraper.Services
                                 await transaction
                                     .RollbackAsync();
 
+
                                 _context
                                     .ChangeTracker
                                     .Clear();
+
 
                                 Console.WriteLine(
                                     "------------------------------------");
 
                                 Console.WriteLine(
-                                    $"[Batch {i}-{i + batch.Count}] failed: " +
+                                    $"[Insert Batch {i}-" +
+                                    $"{i + batch.Count}] failed: " +
                                     $"{ex.InnerException?.Message ?? ex.Message}");
 
                                 Console.WriteLine(
                                     "Retrying this batch row-by-row " +
                                     "to isolate the bad record(s)...");
 
+
                                 return false;
                             }
                         });
 
-                //--------------------------------------------------
+
+                // =================================================
                 // BATCH SUCCESS
-                //--------------------------------------------------
+                // =================================================
 
                 if (batchSucceeded)
                 {
                     totalSaved +=
                         batch.Count;
 
+
                     Console.WriteLine(
                         $"Imported {totalSaved:N0} / " +
-                        $"{newRecords.Count:N0} bids...");
+                        $"{newRecords.Count:N0} new bids...");
+
 
                     continue;
                 }
 
-                //--------------------------------------------------
+
+                // =================================================
                 // ROW-BY-ROW FALLBACK
-                //--------------------------------------------------
+                // =================================================
 
                 foreach (var bid in batch)
                 {
@@ -629,9 +804,11 @@ namespace GemBidScraper.Services
                                 _context.GeMBidExtracts
                                     .Add(bid);
 
+
                                 await _context
                                     .SaveChangesAsync();
                             });
+
 
                         totalSaved++;
                     }
@@ -641,6 +818,7 @@ namespace GemBidScraper.Services
                             rowEx.InnerException?.Message ??
                             rowEx.Message;
 
+
                         failedBids.Add(
                             (
                                 bid.BidNumber ??
@@ -648,6 +826,7 @@ namespace GemBidScraper.Services
 
                                 msg
                             ));
+
 
                         Console.WriteLine(
                             $"  Skipped bad record " +
@@ -661,31 +840,36 @@ namespace GemBidScraper.Services
                     }
                 }
 
+
                 Console.WriteLine(
                     $"Imported {totalSaved:N0} / " +
-                    $"{newRecords.Count:N0} bids " +
+                    $"{newRecords.Count:N0} new bids " +
                     "(after row-level retry)...");
             }
 
-            //--------------------------------------------------
+
+            // =====================================================
             // IMPORT SUMMARY
-            //--------------------------------------------------
+            // =====================================================
 
             Console.WriteLine(
                 "------------------------------------");
 
             Console.WriteLine(
-                "Import Completed.");
+                "New Bid Import Completed.");
 
             Console.WriteLine(
-                $"Total Saved  : {totalSaved:N0} / " +
+                $"Total Saved  : " +
+                $"{totalSaved:N0} / " +
                 $"{newRecords.Count:N0}");
 
             Console.WriteLine(
-                $"Total Failed : {failedBids.Count:N0}");
+                $"Total Failed : " +
+                $"{failedBids.Count:N0}");
 
             Console.WriteLine(
                 "------------------------------------");
+
 
             if (failedBids.Count > 0)
             {
@@ -693,6 +877,226 @@ namespace GemBidScraper.Services
                     $"Failed bid(s) — " +
                     $"{failedBids.Count:N0} total " +
                     "(showing all):");
+
+
+                foreach (
+                    var (num, err)
+                    in failedBids)
+                {
+                    Console.WriteLine(
+                        $"  {num}: {err}");
+                }
+            }
+        }
+
+
+        // ---------------------------------------------------------
+        // SAVE UPDATED RECORDS IN BATCHES
+        // ---------------------------------------------------------
+
+        private async Task SaveUpdatedRecordsInBatchesAsync(
+            List<GeMBidExtract> updatedRecords)
+        {
+            var strategy =
+                _context.Database
+                    .CreateExecutionStrategy();
+
+
+            var failedBids =
+                new List<(string BidNumber, string Error)>();
+
+
+            int totalUpdated = 0;
+
+
+            for (
+                int i = 0;
+                i < updatedRecords.Count;
+                i += BatchSize)
+            {
+                var batch =
+                    updatedRecords
+                        .Skip(i)
+                        .Take(BatchSize)
+                        .ToList();
+
+
+                bool batchSucceeded =
+                    await strategy.ExecuteAsync(
+                        async () =>
+                        {
+                            using var transaction =
+                                await _context.Database
+                                    .BeginTransactionAsync();
+
+
+                            try
+                            {
+                                // Existing entities are already tracked
+                                // by EF Core.
+                                //
+                                // CurrentValues.SetValues() was used
+                                // earlier, so SaveChanges() will issue
+                                // UPDATE statements.
+
+                                await _context
+                                    .SaveChangesAsync();
+
+
+                                await transaction
+                                    .CommitAsync();
+
+
+                                return true;
+                            }
+                            catch (Exception ex)
+                            {
+                                await transaction
+                                    .RollbackAsync();
+
+
+                                Console.WriteLine(
+                                    "------------------------------------");
+
+                                Console.WriteLine(
+                                    $"[Update Batch {i}-" +
+                                    $"{i + batch.Count}] failed: " +
+                                    $"{ex.InnerException?.Message ?? ex.Message}");
+
+                                Console.WriteLine(
+                                    "The update batch will be retried " +
+                                    "row-by-row.");
+
+
+                                return false;
+                            }
+                        });
+
+
+                // =================================================
+                // BATCH SUCCESS
+                // =================================================
+
+                if (batchSucceeded)
+                {
+                    totalUpdated +=
+                        batch.Count;
+
+
+                    Console.WriteLine(
+                        $"Updated {totalUpdated:N0} / " +
+                        $"{updatedRecords.Count:N0} bids...");
+
+
+                    continue;
+                }
+
+
+                // =================================================
+                // ROW-BY-ROW FALLBACK
+                // =================================================
+
+                // The failed batch may have left all entities tracked.
+                // Clear them before retrying one record at a time so
+                // each retry only contains the current bid.
+
+                _context
+                    .ChangeTracker
+                    .Clear();
+
+                foreach (var bid in batch)
+                {
+                    try
+                    {
+                        // -------------------------------------------------
+                        // Attach only this existing entity and mark it
+                        // modified. EF Core will keep the primary key
+                        // as the row identifier and will not update it.
+                        // -------------------------------------------------
+
+                        var entry =
+                            _context.Entry(bid);
+
+                        entry.State =
+                            EntityState.Modified;
+
+
+                        await strategy.ExecuteAsync(
+                            async () =>
+                            {
+                                await _context
+                                    .SaveChangesAsync();
+                            });
+
+
+                        totalUpdated++;
+                    }
+                    catch (Exception rowEx)
+                    {
+                        var msg =
+                            rowEx.InnerException?.Message ??
+                            rowEx.Message;
+
+
+                        failedBids.Add(
+                            (
+                                bid.BidNumber ??
+                                "(no number)",
+
+                                msg
+                            ));
+
+
+                        Console.WriteLine(
+                            $"  Failed update record " +
+                            $"{bid.BidNumber}: {msg}");
+                    }
+                    finally
+                    {
+                        _context
+                            .ChangeTracker
+                            .Clear();
+                    }
+                }
+
+
+                Console.WriteLine(
+                    $"Updated {totalUpdated:N0} / " +
+                    $"{updatedRecords.Count:N0} bids " +
+                    "(after row-level retry)...");
+            }
+
+
+            // =====================================================
+            // UPDATE SUMMARY
+            // =====================================================
+
+            Console.WriteLine(
+                "------------------------------------");
+
+            Console.WriteLine(
+                "Bid Update Completed.");
+
+            Console.WriteLine(
+                $"Total Updated : " +
+                $"{totalUpdated:N0} / " +
+                $"{updatedRecords.Count:N0}");
+
+            Console.WriteLine(
+                $"Total Failed  : " +
+                $"{failedBids.Count:N0}");
+
+            Console.WriteLine(
+                "------------------------------------");
+
+
+            if (failedBids.Count > 0)
+            {
+                Console.WriteLine(
+                    $"Failed update(s) — " +
+                    $"{failedBids.Count:N0} total " +
+                    "(showing all):");
+
 
                 foreach (
                     var (num, err)

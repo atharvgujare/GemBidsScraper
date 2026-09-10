@@ -72,6 +72,28 @@ class PageRequest(BaseModel):
         alias="ministry",
     )
 
+    # ========================================================
+    # IMPORTANT:
+    #
+    # C# sends:
+    #
+    # "knownBidInfo": {
+    #     "GEM/2026/B/7998407": "2026-09-14T14:30:00"
+    # }
+    #
+    # Therefore the value is a string (or null), NOT:
+    #
+    # {
+    #     "EndDate": "..."
+    # }
+    #
+    # ========================================================
+
+    KnownBidInfo: dict[str, Optional[str]] = Field(
+        default_factory=dict,
+        alias="knownBidInfo",
+    )
+
     model_config = ConfigDict(
         populate_by_name=True
     )
@@ -347,22 +369,26 @@ async def extract_online_pages(
     request: PageRequest
 ):
 
-
     print("==========================================")
     print("C# REQUEST RECEIVED BY PYTHON")
     print("==========================================")
+
     """
     Main endpoint.
 
     Flow:
 
+        C# known bid information
+            ↓
         HTTP GeM API
             ↓
         Bid list
             ↓
-        PDF URLs
+        Compare known bids
             ↓
-        Download
+        NEW / CHANGED / UNCHANGED
+            ↓
+        Download PDFs for NEW + CHANGED
             ↓
         PyMuPDF
             ↓
@@ -377,6 +403,7 @@ async def extract_online_pages(
     return await run_scrape_pipeline(
         request.Pages,
         ministry,
+        request.KnownBidInfo,
     )
 
 

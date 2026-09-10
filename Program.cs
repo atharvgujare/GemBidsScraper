@@ -8,43 +8,64 @@ using Microsoft.Extensions.Hosting.WindowsServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ---------------------------------------------------------
+// ============================================================
 // WINDOWS SERVICE
-// ---------------------------------------------------------
-
+// ============================================================
 builder.Host.UseWindowsService(options =>
 {
     options.ServiceName = "GemBidScraperService";
 });
 
-// ---------------------------------------------------------
-// SERILOG FILE LOGGING
-// ---------------------------------------------------------
 
-Directory.CreateDirectory(@"C:\GemBidScraperPublish\Logs");
+// ============================================================
+// SERILOG
+// ============================================================
+// Store logs next to the published application.
+// Example:
+// D:\JemsPublish\GemBidScraper.exe
+// D:\JemsPublish\Logs\log-20260909.txt
+//
+// This works automatically on both development and server
+// machines without hard-coded computer-specific paths.
+// ============================================================
+var logDirectory = Path.Combine(
+    AppContext.BaseDirectory,
+    "Logs"
+);
+
+Directory.CreateDirectory(logDirectory);
 
 builder.Host.UseSerilog((context, config) =>
 {
     config
         .MinimumLevel.Information()
-        .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
+
+        // Reduce noisy EF Core logs
+        .MinimumLevel.Override(
+            "Microsoft.EntityFrameworkCore",
+            Serilog.Events.LogEventLevel.Warning
+        )
+
+        // Console logging
         .WriteTo.Console()
+
+        // File logging
         .WriteTo.File(
-            @"C:\GemBidScraperPublish\Logs\log-.txt",
+            Path.Combine(logDirectory, "log-.txt"),
             rollingInterval: RollingInterval.Day
         );
 });
 
-// ---------------------------------------------------------
-// CONTROLLERS
-// ---------------------------------------------------------
 
+// ============================================================
+// CONTROLLERS
+// ============================================================
 builder.Services.AddControllers();
 
-// ---------------------------------------------------------
-// DATABASE
-// ---------------------------------------------------------
 
+// ============================================================
+// DATABASE
+// ============================================================
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     options.UseSqlServer(
@@ -53,94 +74,106 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         {
             sqlOptions.CommandTimeout(180);
 
-            // Required for a 500k+ bid scrape: transient SQL failures
             sqlOptions.EnableRetryOnFailure(
                 maxRetryCount: 5,
                 maxRetryDelay: TimeSpan.FromSeconds(10),
-                errorNumbersToAdd: null);
+                errorNumbersToAdd: null
+            );
         });
-
-
 });
 
-// ---------------------------------------------------------
-// BACKGROUND SCRAPER SERVICE
-// ---------------------------------------------------------
 
+// ============================================================
+// BACKGROUND SCRAPER
+// ============================================================
 builder.Services.AddHostedService<
-    GemBidScraper.Background.ScraperBackgroundService>();
+    GemBidScraper.Background.ScraperBackgroundService
+>();
 
-// ---------------------------------------------------------
+
+// ============================================================
 // CORS
-// ---------------------------------------------------------
-
+// ============================================================
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowReact",
-        policy =>
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        });
+    options.AddPolicy("AllowReact", policy =>
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
 });
 
-// ---------------------------------------------------------
-// SWAGGER / OPEN API
-// ---------------------------------------------------------
 
+// ============================================================
+// SWAGGER
+// ============================================================
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ---------------------------------------------------------
-// HTTP CLIENTS
-// ---------------------------------------------------------
 
+// ============================================================
+// HTTP CLIENTS
+// ============================================================
 builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<BrowserService>();
 
 builder.Services.AddHttpClient<PythonApiService>();
 
-// ---------------------------------------------------------
-// API SERVICES
-// ---------------------------------------------------------
 
-
-// ---------------------------------------------------------
+// ============================================================
 // CATEGORY CLASSIFICATION
-// ---------------------------------------------------------
-
+// ============================================================
 builder.Services.AddSingleton<CategoryClassifier>();
+
 builder.Services.AddMemoryCache();
 
-// ---------------------------------------------------------
-// PYTHON PARSER API
-// ---------------------------------------------------------
+
+// ============================================================
+// PYTHON PARSER
+// ============================================================
+// Python FastAPI service runs locally on the configured port.
+// ScraperBackgroundService starts/stops the Python service
+// automatically when a scheduled scrape is required.
+// ============================================================
+var pythonPort = builder.Configuration.GetValue<int>(
+    "PythonService:Port",
+    8000
+);
 
 builder.Services.AddHttpClient<PythonParserService>(client =>
 {
-    client.BaseAddress = new Uri("http://127.0.0.1:8000/");
+    client.BaseAddress = new Uri(
+        $"http://127.0.0.1:{pythonPort}/"
+    );
+
+    // PDF scraping/parsing can take a long time.
     client.Timeout = TimeSpan.FromHours(6);
 });
 
-// ---------------------------------------------------------
-// BUILD APPLICATION
-// ---------------------------------------------------------
 
+// ============================================================
+// BUILD APPLICATION
+// ============================================================
 var app = builder.Build();
 
-// ---------------------------------------------------------
-// HTTP REQUEST PIPELINE
-// ---------------------------------------------------------
 
+// ============================================================
+// SWAGGER
+// ============================================================
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+
+// ============================================================
+// MIDDLEWARE
+// ============================================================
 app.UseHttpsRedirection();
 
 app.UseCors("AllowReact");
@@ -149,4 +182,8 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+
+// ============================================================
+// RUN
+// ============================================================
 app.Run();

@@ -44,9 +44,7 @@
 		<Content Remove="PdfParserApi\**" />
 
 		<!-- Publish Python source/config files, but exclude venv and cache -->
-		<Content Include="PdfParserApi\**"
-				 Exclude="PdfParserApi\venv\**;
-                    PdfParserApi\__pycache__\**">
+		<Content Include="PdfParserApi\**" Exclude="PdfParserApi\venv\**;&#xD;&#xA;                    PdfParserApi\__pycache__\**">
 
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>

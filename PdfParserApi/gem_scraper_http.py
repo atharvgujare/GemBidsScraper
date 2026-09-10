@@ -901,7 +901,7 @@ if __name__ == "__main__":
 
             try:
 
-                pdf_response = requests.get(
+                pdf_response = session.get(
                     test_pdf_url,
                     headers={
                         "User-Agent": USER_AGENT,

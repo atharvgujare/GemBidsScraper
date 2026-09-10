@@ -66,7 +66,7 @@ namespace GemBidScraper.Data
                 entity.Property(x => x.CardMinistry).HasMaxLength(450);
                 entity.Property(x => x.CardDepartment).HasMaxLength(450);
                 entity.Property(x => x.CardItemName).HasColumnType("nvarchar(max)");
-                entity.Property(x => x.OfficeName).HasMaxLength(1000);
+                entity.Property(x => x.OfficeName).HasColumnType("nvarchar(max)");
                 entity.Property(x => x.TypeOfBid).HasMaxLength(1000);
                 entity.Property(x => x.EvaluationMethod).HasMaxLength(1000);
                 entity.Property(x => x.RAQualificationRule).HasMaxLength(1000);
