@@ -515,7 +515,8 @@ namespace GemBidScraper.Services
                 foreach (var property in existingEntry.Metadata.GetProperties())
                 {
                     if (property.IsPrimaryKey() ||
-                        property.Name == nameof(GeMBidExtract.CreatedOn))
+                        property.Name == nameof(GeMBidExtract.CreatedOn) ||
+                        property.Name == nameof(GeMBidExtract.UpdatedOn))
                     {
                         continue;
                     }
@@ -542,6 +543,14 @@ namespace GemBidScraper.Services
 
                 existing.CreatedOn =
                     existingCreatedOn;
+
+
+                // -------------------------------------------------
+                // SET LAST UPDATED TIME
+                // -------------------------------------------------
+
+                existing.UpdatedOn =
+                    DateTime.Now;
 
 
                 updatedRecords.Add(existing);

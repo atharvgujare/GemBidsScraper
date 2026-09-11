@@ -13,6 +13,8 @@ namespace GemBidScraper.Models
 
         public DateTime CreatedOn { get; set; } = DateTime.Now;
 
+        public DateTime? UpdatedOn { get; set; }
+
         // =========================
         // Bid
         // =========================
@@ -236,6 +238,8 @@ namespace GemBidScraper.Models
 
 
         public string? CategorySubKey { get; set; }
+
+       
 
     }
 }
