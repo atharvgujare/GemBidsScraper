@@ -18,6 +18,8 @@ VERBOSE = _cfg.get("verbose", False)
 BASE_URL = "https://bidplus.gem.gov.in/"
 ADVANCE_SEARCH_URL = "https://bidplus.gem.gov.in/advance-search"
 SEARCH_BIDS_URL = "https://bidplus.gem.gov.in/search-bids"
+ALL_BIDS_PAGE_URL = "https://bidplus.gem.gov.in/all-bids"
+ALL_BIDS_DATA_URL = "https://bidplus.gem.gov.in/all-bids-data"
 
 REQUEST_TIMEOUT_S = 20
 
@@ -218,12 +220,24 @@ def _parse_cards(
         if not bid_number:
             continue
 
+        bid_id = _get_doc_value(
+            doc,
+            "b_id"
+        )
+
         # GeM search can also return reverse-auction records such as
-        # GEM/2026/R/123456. Those do not use the normal bid PDF document
-        # endpoint reliably; many return HTTP 200 with an empty body. This
-        # pipeline stores bid records only, so keep only GEM/.../B/... here.
+        # GEM/2026/R/123456. In such records, GeM provides
+        # b_bid_number_parent and b_id_parent pointing to the underlying
+        # bid document (GEM/.../B/...). Resolve to the parent /B/ bid.
         if "/B/" not in str(bid_number):
-            continue
+            parent_bid = _get_doc_value(doc, "b_bid_number_parent")
+            parent_id = _get_doc_value(doc, "b_id_parent")
+            if parent_bid and "/B/" in str(parent_bid):
+                bid_number = parent_bid
+                if parent_id:
+                    bid_id = parent_id
+            else:
+                continue
 
         # ----------------------------------------------------
         # ITEM / CATEGORY
@@ -290,13 +304,13 @@ def _parse_cards(
         )
 
         # ----------------------------------------------------
-        # BID ID
+        # BID ID (already resolved above if parent was used)
         # ----------------------------------------------------
-
-        bid_id = _get_doc_value(
-            doc,
-            "b_id"
-        )
+        if not bid_id:
+            bid_id = _get_doc_value(
+                doc,
+                "b_id"
+            )
 
         # ----------------------------------------------------
         # CATEGORY ID
@@ -553,23 +567,284 @@ def _fetch_page_html(
 
 
 # ============================================================
+# CREATE ALL-BIDS SESSION
+# ============================================================
+
+def _make_all_bids_session() -> requests.Session:
+    """
+    Creates a requests session and loads GeM's all-bids page.
+    The initial GET establishes the GeM session and obtains the
+    csrf_gem_cookie required by the all-bids-data request.
+    """
+    session = requests.Session()
+
+    session.headers.update({
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": ALL_BIDS_PAGE_URL,
+        "Origin": BASE_URL,
+        "Connection": "keep-alive",
+    })
+
+    print("[HTTP] Opening GeM all-bids page...")
+
+    response = session.get(
+        ALL_BIDS_PAGE_URL,
+        timeout=REQUEST_TIMEOUT_S
+    )
+
+    response.raise_for_status()
+
+    if "csrf_gem_cookie" not in session.cookies.get_dict():
+        raise RuntimeError(
+            "GeM did not set csrf_gem_cookie on all-bids page load."
+        )
+
+    return session
+
+
+# ============================================================
+# FETCH ONE ALL-BIDS PAGE
+# ============================================================
+
+def _fetch_all_bids_page(
+    session: requests.Session,
+    page: int
+) -> str:
+    """
+    Calls GeM's /all-bids-data endpoint.
+    """
+    payload_obj = {
+        "page": page,
+        "param": {
+            "searchBid": "",
+            "searchType": "fullText"
+        },
+        "filter": {
+            "bidStatusType": "ongoing_bids",
+            "byType": "all",
+            "highBidValue": "",
+            "byEndDate": {
+                "from": "",
+                "to": ""
+            },
+            "sort": "Bid-End-Date-Oldest"
+        }
+    }
+
+    csrf_token = session.cookies.get(
+        "csrf_gem_cookie",
+        ""
+    )
+
+    if not csrf_token:
+        raise RuntimeError(
+            "csrf_gem_cookie is missing from the session."
+        )
+
+    form_data = {
+        "payload": json.dumps(
+            payload_obj,
+            separators=(",", ":")
+        ),
+        "csrf_bd_gem_nk": csrf_token,
+    }
+
+    headers = {
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": ALL_BIDS_PAGE_URL,
+        "Origin": BASE_URL,
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Content-Type": (
+            "application/x-www-form-urlencoded; "
+            "charset=UTF-8"
+        ),
+    }
+
+    last_exception: Exception = RuntimeError(
+        "No request attempt was made."
+    )
+
+    for attempt in range(
+        1,
+        MAX_RETRIES_PER_PAGE + 1
+    ):
+        try:
+            if VERBOSE:
+                print(
+                    f"[HTTP] Requesting all-bids page {page} "
+                    f"(attempt {attempt}/"
+                    f"{MAX_RETRIES_PER_PAGE})..."
+                )
+
+            response = session.post(
+                ALL_BIDS_DATA_URL,
+                data=form_data,
+                headers=headers,
+                timeout=REQUEST_TIMEOUT_S
+            )
+
+            response.raise_for_status()
+            return response.text
+
+        except requests.RequestException as ex:
+            last_exception = ex
+
+            print(
+                f"[HTTP] All-bids page {page} request failed "
+                f"(attempt {attempt}/"
+                f"{MAX_RETRIES_PER_PAGE}): {ex}"
+            )
+
+            if attempt < MAX_RETRIES_PER_PAGE:
+                time.sleep(
+                    RETRY_BACKOFF_S * attempt
+                )
+
+    raise last_exception
+
+
+# ============================================================
+# ALL BIDS SCRAPER
+# ============================================================
+
+def get_all_bids_urls(
+    total_pages: int = -1
+) -> List[Dict[str, Any]]:
+    """
+    Fetches bids directly from GeM's All Bids listing page (/all-bids-data).
+    """
+    start = time.perf_counter()
+
+    print()
+    print(
+        f"[Scraper] Searching ALL BIDS listing "
+        f"({total_pages} pages requested) "
+        f"via direct HTTP requests..."
+    )
+
+    try:
+        session = _make_all_bids_session()
+    except Exception as ex:
+        print(
+            f"[Scraper] Could not create GeM all-bids session: {ex}"
+        )
+        return []
+
+    all_bids: Dict[str, Dict[str, Any]] = {}
+    pages_fetched = 0
+    page = 1
+
+    while True:
+        if total_pages > 0 and page > total_pages:
+            break
+
+        try:
+            response_text = _fetch_all_bids_page(
+                session,
+                page
+            )
+        except requests.RequestException as ex:
+            print(
+                f"[Scraper] Stopped at all-bids page {page}: "
+                f"request failed after {MAX_RETRIES_PER_PAGE} retries. Error: {ex}"
+            )
+            break
+        except Exception as ex:
+            print(
+                f"[Scraper] Stopped at all-bids page {page}: {ex}"
+            )
+            break
+
+        bids = _parse_cards(
+            response_text,
+            ministry=""
+        )
+
+        if not bids:
+            print(
+                f"[Scraper] Stopped at all-bids page {page}: "
+                "no bid records found in response."
+            )
+            break
+
+        for bid in bids:
+            bid_number = bid.get("bid_number")
+            if not bid_number:
+                continue
+            all_bids[bid_number] = bid
+
+        pages_fetched = page
+
+        if VERBOSE:
+            if total_pages > 0:
+                print(
+                    f"[Scraper] All-Bids Page {page}/{total_pages}: "
+                    f"{len(bids)} bids, "
+                    f"{len(all_bids)} unique so far"
+                )
+            else:
+                print(
+                    f"[Scraper] All-Bids Page {page}: "
+                    f"{len(bids)} bids, "
+                    f"{len(all_bids)} unique so far"
+                )
+        elif page % 10 == 0:
+            if total_pages > 0:
+                print(
+                    f"[Scraper] All-Bids Page {page}/{total_pages}, "
+                    f"{len(all_bids)} unique bids so far..."
+                )
+            else:
+                print(
+                    f"[Scraper] All-Bids Page {page}, "
+                    f"{len(all_bids)} unique bids so far..."
+                )
+        elif page <= 3:
+            print(
+                f"[Scraper] All-Bids Page {page}: "
+                f"{len(bids)} bids, "
+                f"{len(all_bids)} unique so far"
+            )
+
+        time.sleep(REQUEST_DELAY_S)
+        page += 1
+
+    elapsed = time.perf_counter() - start
+
+    print()
+    print(
+        f"[Scraper] Done: "
+        f"{len(all_bids)} unique bids "
+        f"from {pages_fetched} all-bids page(s) "
+        f"in {elapsed:.1f}s"
+    )
+
+    return list(all_bids.values())
+
+
+# ============================================================
 # MAIN SCRAPER
 # ============================================================
 
 def get_pdf_urls(
     total_pages: int = -1,
-    ministry: str = "Ministry of Defence"
+    ministry: str = "Ministry of Defence",
+    all_bids: bool = False
 ) -> List[Dict[str, Any]]:
     """
     Fetches bids from GeM using direct HTTP requests.
 
-    total_pages:
-        -1 = automatically walk every available page for the ministry
-        >0 = scrape exactly that many pages (useful for testing)
+    When all_bids is True, it scrapes directly from the All Bids listing page.
+    Otherwise, it scrapes for the specified ministry.
 
-    When total_pages=-1, the scraper keeps requesting pages until GeM
-    returns no bids.
+    total_pages:
+        -1 = automatically walk every available page
+        >0 = scrape exactly that many pages (useful for testing)
     """
+    if all_bids:
+        return get_all_bids_urls(total_pages)
 
     start = time.perf_counter()
 

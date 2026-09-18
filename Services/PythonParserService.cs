@@ -65,8 +65,9 @@ namespace GemBidScraper.Services
         // ---------------------------------------------------------
 
         public async Task<List<GeMBidExtract>> ParseOnlineAsync(
-     int pages,
-     string ministry)
+            int pages,
+            string? ministry = null,
+            bool allBids = false)
         {
             var runStopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
@@ -88,6 +89,7 @@ namespace GemBidScraper.Services
             {
                 Pages = pages,
                 Ministry = ministry,
+                AllBids = allBids,
                 KnownBidInfo = knownBidInfo
             };
 
@@ -97,7 +99,7 @@ namespace GemBidScraper.Services
             Console.WriteLine($"[C#] BaseAddress: {_httpClient.BaseAddress}");
             Console.WriteLine("[C#] Endpoint: extract-online-pages");
             Console.WriteLine($"[C#] Pages: {pages}");
-            Console.WriteLine($"[C#] Ministry: {ministry}");
+            Console.WriteLine($"[C#] Mode: {(allBids ? "All Bids" : $"Ministry: {ministry}")}");
             Console.WriteLine($"[C#] Known bids: {knownBidInfo.Count}");
             Console.WriteLine("==========================================");
 

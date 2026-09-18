@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using GemBidScraper.Data;
 using GemBidScraper.Services;
 using Microsoft.EntityFrameworkCore;
@@ -117,38 +117,64 @@ namespace GemBidScraper.Background
                 var pages = int.Parse(
      _config["PythonService:Pages"] ?? "5");
 
-                var ministries =
-                    _config
-                        .GetSection("PythonService:Ministry")
-                        .Get<string[]>();
+                var allBidsSetting = _config["PythonService:All-bids"]
+                                     ?? _config["PythonService:AllBids"]
+                                     ?? "off";
 
-                if (ministries == null || ministries.Length == 0)
-                {
-                    _logger.LogWarning(
-                        "No ministries configured. Scrape run skipped.");
+                bool isAllBids = allBidsSetting.Equals("on", StringComparison.OrdinalIgnoreCase)
+                                 || allBidsSetting.Equals("true", StringComparison.OrdinalIgnoreCase);
 
-                    return;
-                }
-
-                foreach (var ministry in ministries)
+                if (isAllBids)
                 {
                     _logger.LogInformation(
-                        "Starting scrape for ministry: {Ministry}",
-                        ministry);
+                        "All-bids setting is ON. Starting scrape directly from All Bids listing page...");
 
                     var processedBids =
                         await parser.ParseOnlineAsync(
                             pages,
-                            ministry);
+                            ministry: null,
+                            allBids: true);
 
                     _logger.LogInformation(
-                        "Scrape completed for {Ministry}. Processed {Count} bids.",
-                        ministry,
+                        "All-bids scrape completed. Processed {Count} bids.",
                         processedBids.Count);
                 }
+                else
+                {
+                    var ministries =
+                        _config
+                            .GetSection("PythonService:Ministry")
+                            .Get<string[]>();
 
-                _logger.LogInformation(
-                    "Scheduled scrape run completed for all ministries.");
+                    if (ministries == null || ministries.Length == 0)
+                    {
+                        _logger.LogWarning(
+                            "All-bids is OFF and no ministries configured. Scrape run skipped.");
+
+                        return;
+                    }
+
+                    foreach (var ministry in ministries)
+                    {
+                        _logger.LogInformation(
+                            "Starting scrape for ministry: {Ministry}",
+                            ministry);
+
+                        var processedBids =
+                            await parser.ParseOnlineAsync(
+                                pages,
+                                ministry,
+                                allBids: false);
+
+                        _logger.LogInformation(
+                            "Scrape completed for {Ministry}. Processed {Count} bids.",
+                            ministry,
+                            processedBids.Count);
+                    }
+
+                    _logger.LogInformation(
+                        "Scheduled scrape run completed for all configured ministries.");
+                }
             }
             catch (Exception ex)
             {

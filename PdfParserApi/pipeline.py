@@ -349,8 +349,9 @@ class _Progress:
 
 async def run_scrape_pipeline(
     pages: int,
-    ministry: str,
+    ministry: str | None = None,
     known_bid_info: dict | None = None,
+    all_bids: bool = False,
 ) -> dict:
     """
     Full pipeline:
@@ -371,21 +372,26 @@ async def run_scrape_pipeline(
         Number of GeM pages to scan.
 
     ministry:
-        Ministry filter used by the GeM scraper.
+        Ministry filter used by the GeM scraper (when all_bids=False).
 
     known_bid_info:
         Dictionary received from C# containing known BidNumbers
         and their existing CardEndDate values.
+
+    all_bids:
+        When True, scrapes directly from GeM's All Bids listing page.
     """
 
     start = time.perf_counter()
 
     loop = asyncio.get_running_loop()
 
+    target_name = "All Bids" if all_bids else (ministry or "Default Ministry")
+
     print()
     print(
         f"[Pipeline] Starting scrape: "
-        f"{ministry}, {pages} pages..."
+        f"{target_name}, {pages} pages..."
     )
 
     # ========================================================
@@ -398,7 +404,8 @@ async def run_scrape_pipeline(
             None,
             get_pdf_urls,
             pages,
-            ministry,
+            ministry or "",
+            all_bids,
         )
 
     except Exception as ex:
@@ -408,7 +415,7 @@ async def run_scrape_pipeline(
         )
 
         return {
-            "Ministry": ministry,
+            "Ministry": target_name,
             "Pages": pages,
             "TotalPdfFound": 0,
             "ProcessedBids": 0,
@@ -436,7 +443,7 @@ async def run_scrape_pipeline(
         )
 
         return {
-            "Ministry": ministry,
+            "Ministry": target_name,
             "Pages": pages,
             "TotalPdfFound": 0,
             "ProcessedBids": 0,
@@ -683,7 +690,7 @@ async def run_scrape_pipeline(
     # ========================================================
 
     return {
-        "Ministry": ministry,
+        "Ministry": target_name,
         "Pages": pages,
 
         # All bids discovered from GeM.

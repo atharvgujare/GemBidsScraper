@@ -1,5 +1,6 @@
 using GemBidScraper.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Threading.Tasks;
 
@@ -10,40 +11,59 @@ namespace GemBidScraper.Controllers
     public class ExtractController : ControllerBase
     {
         private readonly PythonParserService _pythonParserService;
+        private readonly IConfiguration _config;
 
-        public ExtractController(PythonParserService pythonParserService)
+        public ExtractController(
+            PythonParserService pythonParserService,
+            IConfiguration config)
         {
             _pythonParserService = pythonParserService;
+            _config = config;
         }
 
         /// <summary>
-        /// Runs a scrape for the given ministry.
+        /// Runs a scrape from either All Bids or a given ministry.
         ///
         /// `pages` defaults to -1, which tells the scraper to walk GeM's
-        /// ENTIRE listing for that ministry rather than stopping after a
-        /// fixed number of pages. Do this in normal use — it's what
-        /// guarantees bids don't get missed just because they weren't on
-        /// page 1, or are sitting near the end of the list. It's safe to
-        /// leave as the default because listing pages are cheap to walk;
-        /// the expensive PDF work only happens for bids that are new
-        /// (see PythonParserService.ParseOnlineAsync).
+        /// ENTIRE listing rather than stopping after a fixed number of pages.
         ///
-        /// Pass a positive number only for a quick manual/test run where
-        /// you deliberately want to cap how much gets scraped.
+        /// `allBids`: When true, scrapes from https://bidplus.gem.gov.in/all-bids.
+        /// When null, defaults to the "PythonService:All-bids" setting in appsettings.json.
         /// </summary>
         [HttpPost("online")]
         public async Task<IActionResult> ParseOnline(
             [FromQuery] int pages = -1,
-            [FromQuery] string ministry = "Ministry of Defence")
+            [FromQuery] string? ministry = null,
+            [FromQuery] bool? allBids = null)
         {
             try
             {
-                var bids = await _pythonParserService.ParseOnlineAsync(pages, ministry);
+                bool isAllBids;
+                if (allBids.HasValue)
+                {
+                    isAllBids = allBids.Value;
+                }
+                else
+                {
+                    var allBidsSetting = _config["PythonService:All-bids"]
+                                         ?? _config["PythonService:AllBids"]
+                                         ?? "off";
+                    isAllBids = allBidsSetting.Equals("on", StringComparison.OrdinalIgnoreCase)
+                                || allBidsSetting.Equals("true", StringComparison.OrdinalIgnoreCase);
+                }
+
+                string effectiveMinistry = ministry ?? (isAllBids ? "All Bids" : "Ministry of Defence");
+
+                var bids = await _pythonParserService.ParseOnlineAsync(
+                    pages,
+                    isAllBids ? null : effectiveMinistry,
+                    allBids: isAllBids);
 
                 return Ok(new
                 {
                     Success = true,
-                    Ministry = ministry,
+                    Mode = isAllBids ? "All Bids" : "Ministry",
+                    Ministry = effectiveMinistry,
                     Pages = pages,
                     TotalRecords = bids.Count,
                     Data = bids

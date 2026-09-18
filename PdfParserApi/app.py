@@ -72,6 +72,11 @@ class PageRequest(BaseModel):
         alias="ministry",
     )
 
+    AllBids: Optional[bool] = Field(
+        False,
+        alias="allBids",
+    )
+
     # ========================================================
     # IMPORTANT:
     #
@@ -348,10 +353,11 @@ async def pdf_urls(
         get_pdf_urls,
         request.Pages,
         ministry,
+        bool(request.AllBids),
     )
 
     return {
-        "Ministry": ministry,
+        "Ministry": "All Bids" if request.AllBids else ministry,
         "TotalBids": len(bids),
         "Bids": bids,
         "TimeTaken": (
@@ -371,6 +377,7 @@ async def extract_online_pages(
 
     print("==========================================")
     print("C# REQUEST RECEIVED BY PYTHON")
+    print(f"All-Bids Mode: {bool(request.AllBids)}")
     print("==========================================")
 
     """
@@ -380,7 +387,7 @@ async def extract_online_pages(
 
         C# known bid information
             ↓
-        HTTP GeM API
+        HTTP GeM API (All Bids or Ministry Search)
             ↓
         Bid list
             ↓
@@ -404,6 +411,7 @@ async def extract_online_pages(
         request.Pages,
         ministry,
         request.KnownBidInfo,
+        all_bids=bool(request.AllBids),
     )
 
 
