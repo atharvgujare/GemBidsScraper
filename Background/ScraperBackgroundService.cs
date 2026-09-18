@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics;
+using GemBidScraper.Data;
 using GemBidScraper.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -93,6 +95,14 @@ namespace GemBidScraper.Background
         {
             try
             {
+                if (!await IsDatabaseReadyAsync(ct))
+                {
+                    _logger.LogWarning(
+                        "Database is not reachable. Scrape run skipped before starting Python.");
+
+                    return;
+                }
+
                 await StartPythonServiceAsync(ct);
 
                 await WaitForPythonReadyAsync(ct);
@@ -105,20 +115,40 @@ namespace GemBidScraper.Background
                         .GetRequiredService<PythonParserService>();
 
                 var pages = int.Parse(
-                    _config["PythonService:Pages"] ?? "5");
+     _config["PythonService:Pages"] ?? "5");
 
-                var ministry =
-                    _config["PythonService:Ministry"]
-                    ?? "Ministry of Defence";
+                var ministries =
+                    _config
+                        .GetSection("PythonService:Ministry")
+                        .Get<string[]>();
 
-                var processedBids =
-                    await parser.ParseOnlineAsync(
-                        pages,
+                if (ministries == null || ministries.Length == 0)
+                {
+                    _logger.LogWarning(
+                        "No ministries configured. Scrape run skipped.");
+
+                    return;
+                }
+
+                foreach (var ministry in ministries)
+                {
+                    _logger.LogInformation(
+                        "Starting scrape for ministry: {Ministry}",
                         ministry);
 
+                    var processedBids =
+                        await parser.ParseOnlineAsync(
+                            pages,
+                            ministry);
+
+                    _logger.LogInformation(
+                        "Scrape completed for {Ministry}. Processed {Count} bids.",
+                        ministry,
+                        processedBids.Count);
+                }
+
                 _logger.LogInformation(
-                    "Scheduled scrape run completed. Processed {Count} bids (new + updated).",
-                    processedBids.Count);
+                    "Scheduled scrape run completed for all ministries.");
             }
             catch (Exception ex)
             {
@@ -130,6 +160,30 @@ namespace GemBidScraper.Background
             {
                 StopPythonService();
             }
+        }
+
+        // =========================================================
+        // DATABASE PREFLIGHT
+        // =========================================================
+
+        private async Task<bool> IsDatabaseReadyAsync(
+            CancellationToken ct)
+        {
+            using var scope =
+                _services.CreateScope();
+
+            var db =
+                scope.ServiceProvider
+                    .GetRequiredService<ApplicationDbContext>();
+
+            var strategy =
+                db.Database.CreateExecutionStrategy();
+
+            return await strategy.ExecuteAsync(
+                async () =>
+                {
+                    return await db.Database.CanConnectAsync(ct);
+                });
         }
 
         // =========================================================

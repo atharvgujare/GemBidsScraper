@@ -12,12 +12,86 @@ STOP_HEADERS = [
     "GTC"
 ]
 
+CANONICAL_KEY_PATTERNS = [
+    ("Bid End Date/Time", ["bid end date/time", "bid end date"]),
+    ("Bid Opening Date/Time", ["bid opening date/time", "bid opening date"]),
+    ("Bid Offer Validity (From End Date)", ["bid offer validity"]),
+    ("Ministry/State Name", ["ministry/state name", "ministry name"]),
+    ("Department Name", ["department name"]),
+    ("Organisation Name", ["organisation name", "organization name"]),
+    ("Office Name", ["office name"]),
+    ("Contact details of Grievance redressal", ["contact details of grievance"]),
+    ("Total Quantity", ["total quantity"]),
+    ("Item Category", ["item category"]),
+    ("Primary product category", ["primary product category"]),
+    ("GeMARPTS / Searched Strings used in GeMARPTS", ["searched strings used in gemarpts"]),
+    ("GeMARPTS / Searched Result generated in GeMARPTS", ["searched result generated in gemarpts"]),
+    ("Relevant Categories selected for notification", ["relevant categories selected for notification"]),
+    ("Document required from seller", ["document required from seller"]),
+    ("Minimum number of bids required to disable automatic bid extension", ["minimum number of bids required"]),
+    ("Number of days for which Bid would be auto-extended", ["number of days for which bid would be auto"]),
+    ("Number of Auto Extension count", ["number of auto extension count"]),
+    ("Bid to RA enabled", ["bid to ra enabled"]),
+    ("RA Qualification Rule", ["ra qualification rule"]),
+    ("ITC available to buyer", ["itc available to buyer"]),
+    ("Type of Bid", ["type of bid"]),
+    ("Time allowed for Technical Clarifications during technical evaluation", ["time allowed for technical"]),
+    ("Inspection Required", ["inspection required"]),
+    ("Evaluation Method", ["evaluation method"]),
+    ("Estimated Bid Value in INR", ["estimated bid value"]),
+    ("EMD Amount (In INR)", ["emd amount"]),
+    ("ePBG Percentage(%)", ["epbg percentage"]),
+    ("Duration of ePBG required (Months).", ["duration of epbg required"]),
+    ("MSE Purchase Preference", ["mse purchase preference"]),
+    ("MII Purchase Preference", ["mii purchase preference"]),
+    ("Purchase Preference to MII sellers availabele upto price within L1+X%", ["purchase preference to mii sellers"]),
+    ("Purchase Preference to MSE OEMs/ Service Provider available upto price within L1+X%", ["purchase preference to mse oems"]),
+    ("Percentage of Bid quantity/amount for MSE OEMs/ Service Provider Purchase preference", ["percentage of bid quantity/amount for mse"]),
+    ("Maximum Percentage of Bid quantity for MII purchase preference", ["maximum percentage of bid quantity for mii"]),
+    ("Arbitration Clause", ["arbitration clause"]),
+    ("Mediation Clause", ["mediation clause"]),
+    ("Advisory Bank", ["advisory bank"]),
+    ("Buyer Specification Document", ["buyer specification document"]),
+    ("BOQ Detail Document", ["boq detail document"]),
+    ("Consignee Name", ["consignee name", "consignee reporting/officer"]),
+    ("Consignee Address", ["consignee address", "delivery address"]),
+    ("Consignee Quantity", ["consignee quantity"]),
+]
+
+
+def normalize_for_match(value):
+    value = value.lower()
+    value = re.sub(r"[^a-z0-9/%+ ]+", " ", value)
+    value = re.sub(r"\s+", " ", value)
+    return value.strip()
+
+
+def canonical_key(key):
+    normalized = normalize_for_match(key)
+
+    # Many noisy keys look like "T X /Evaluation Method". Prefer the
+    # meaningful suffix after the slash when it contains real words.
+    if "/" in key:
+        suffix = key.rsplit("/", 1)[-1].strip()
+        if len(re.findall(r"[A-Za-z]", suffix)) >= 4:
+            normalized_suffix = normalize_for_match(suffix)
+            for canonical, patterns in CANONICAL_KEY_PATTERNS:
+                if any(pattern in normalized_suffix for pattern in patterns):
+                    return canonical
+
+    for canonical, patterns in CANONICAL_KEY_PATTERNS:
+        if any(pattern in normalized for pattern in patterns):
+            return canonical
+
+    return key
+
 
 def clean_key(key):
     key = clean(key)
     key = re.sub(r'^[^A-Za-z0-9]+', '', key)
     key = re.sub(r'\s+', ' ', key)
-    return key.strip()
+    key = key.strip()
+    return canonical_key(key)
 
 
 def clean_value(value):

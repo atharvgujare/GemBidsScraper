@@ -1,4 +1,6 @@
-﻿using GemBidScraper.Data;
+
+
+using GemBidScraper.Data;
 using GemBidScraper.GeMBIdMapper;
 using GemBidScraper.Models;
 using GemBidScraper.Services.CategoryClassification;
@@ -63,8 +65,8 @@ namespace GemBidScraper.Services
         // ---------------------------------------------------------
 
         public async Task<List<GeMBidExtract>> ParseOnlineAsync(
-            int pages,
-            string ministry = "Ministry of Defence")
+     int pages,
+     string ministry)
         {
             var runStopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
@@ -457,13 +459,16 @@ namespace GemBidScraper.Services
                 // =================================================
 
                 var category =
-                    _categoryClassifier.Classify(
-                        $"{bid.BOQTitle} " +
-                        $"{bid.PrimaryProductCategory} " +
-                        $"{bid.SimilarCategory}",
-
-                        $"{bid.ItemCategory} " +
-                        $"{bid.Specification}");
+                    _categoryClassifier.Classify(new BidClassificationInput
+                    {
+                        CardItemName = bid.CardItemName,
+                        ItemCategory = bid.ItemCategory,
+                        PrimaryProductCategory = bid.PrimaryProductCategory,
+                        SimilarCategory = bid.SimilarCategory,
+                        BOQTitle = bid.BOQTitle,
+                        RelevantNotificationCategory = bid.RelevantCategoriesSelectedForNotification,
+                        Specification = bid.Specification
+                    });
 
 
                 bid.CategoryKey =
@@ -617,6 +622,9 @@ namespace GemBidScraper.Services
         }
 
 
+
+
+
         // ---------------------------------------------------------
         // GET KNOWN ACTIVE/RECENT BID INFORMATION
         // ---------------------------------------------------------
@@ -628,18 +636,55 @@ namespace GemBidScraper.Services
                 DateTime.Now.AddDays(
                     -KnownBidLookbackBufferDays);
 
+            var knownBids =
+                new Dictionary<string, DateTime?>();
 
-            return await _context.GeMBidExtracts
+            // Keep this lookup index-friendly. A single query with
+            // "CardEndDate IS NULL OR CardEndDate >= cutoff" can become
+            // very expensive on large tables because old rows with null
+            // dates stay eligible forever. Split the lookup so SQL Server
+            // can use the CardEndDate and CreatedOn indexes separately.
+            var activeOrRecentBids =
+                await _context.GeMBidExtracts
                 .AsNoTracking()
                 .Where(x =>
                     x.BidNumber != null &&
-                    (
-                        x.CardEndDate == null ||
-                        x.CardEndDate >= cutoff
-                    ))
-                .ToDictionaryAsync(
-                    x => x.BidNumber!,
-                    x => x.CardEndDate);
+                    x.CardEndDate != null &&
+                    x.CardEndDate >= cutoff)
+                .Select(x => new
+                {
+                    x.BidNumber,
+                    x.CardEndDate
+                })
+                .ToListAsync();
+
+            foreach (var bid in activeOrRecentBids)
+            {
+                knownBids[bid.BidNumber!] =
+                    bid.CardEndDate;
+            }
+
+            var recentBidsWithoutEndDate =
+                await _context.GeMBidExtracts
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.BidNumber != null &&
+                        x.CardEndDate == null &&
+                        x.CreatedOn >= cutoff)
+                    .Select(x => new
+                    {
+                        x.BidNumber,
+                        x.CardEndDate
+                    })
+                    .ToListAsync();
+
+            foreach (var bid in recentBidsWithoutEndDate)
+            {
+                knownBids[bid.BidNumber!] =
+                    bid.CardEndDate;
+            }
+
+            return knownBids;
         }
 
 
@@ -1055,7 +1100,6 @@ namespace GemBidScraper.Services
                                 msg
                             ));
 
-
                         Console.WriteLine(
                             $"  Failed update record " +
                             $"{bid.BidNumber}: {msg}");
@@ -1115,6 +1159,99 @@ namespace GemBidScraper.Services
                         $"  {num}: {err}");
                 }
             }
+        }
+
+
+
+
+        // ---------------------------------------------------------
+        // RECLASSIFY EXISTING BIDS IN DATABASE
+        // ---------------------------------------------------------
+
+        public async Task<object> ReclassifyBidsAsync(
+            int? take = null,
+            string? specificBidNumber = null)
+        {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            IQueryable<GeMBidExtract> query = _context.GeMBidExtracts;
+
+            if (!string.IsNullOrWhiteSpace(specificBidNumber))
+            {
+                query = query.Where(x => x.BidNumber == specificBidNumber);
+            }
+            else
+            {
+                query = query.OrderByDescending(x => x.Id);
+                if (take.HasValue && take.Value > 0)
+                {
+                    query = query.Take(take.Value);
+                }
+            }
+
+            var bids = await query.ToListAsync();
+
+            int totalProcessed = bids.Count;
+            int totalUpdated = 0;
+            var updatedBids = new List<object>();
+            var modifiedBids = new List<GeMBidExtract>();
+
+            foreach (var bid in bids)
+            {
+                var newClassification = _categoryClassifier.Classify(new BidClassificationInput
+                {
+                    CardItemName = bid.CardItemName,
+                    ItemCategory = bid.ItemCategory,
+                    PrimaryProductCategory = bid.PrimaryProductCategory,
+                    SimilarCategory = bid.SimilarCategory,
+                    BOQTitle = bid.BOQTitle,
+                    RelevantNotificationCategory = bid.RelevantCategoriesSelectedForNotification,
+                    Specification = bid.Specification
+                });
+
+                bool changed = bid.CategoryKey != newClassification.CategoryKey ||
+                               bid.CategorySubKey != newClassification.CategorySubKey;
+
+                if (changed)
+                {
+                    string oldCategory = $"{bid.CategoryKey} > {bid.CategorySubKey}";
+                    string newCategory = $"{newClassification.CategoryKey} > {newClassification.CategorySubKey}";
+
+                    bid.CategoryKey = newClassification.CategoryKey;
+                    bid.CategorySubKey = newClassification.CategorySubKey;
+                    bid.UpdatedOn = DateTime.Now;
+
+                    totalUpdated++;
+                    modifiedBids.Add(bid);
+
+                    if (updatedBids.Count < 200)
+                    {
+                        updatedBids.Add(new
+                        {
+                            BidNumber = bid.BidNumber,
+                            Title = bid.CardItemName,
+                            OldCategory = oldCategory,
+                            NewCategory = newCategory
+                        });
+                    }
+                }
+            }
+
+            if (modifiedBids.Count > 0)
+            {
+                await SaveUpdatedRecordsInBatchesAsync(modifiedBids);
+            }
+
+            stopwatch.Stop();
+
+            return new
+            {
+                Success = true,
+                TotalProcessed = totalProcessed,
+                TotalUpdated = totalUpdated,
+                Elapsed = $"{stopwatch.Elapsed:hh\\:mm\\:ss\\.fff}",
+                SampleUpdatedBids = updatedBids
+            };
         }
     }
 }

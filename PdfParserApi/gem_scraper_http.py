@@ -218,6 +218,13 @@ def _parse_cards(
         if not bid_number:
             continue
 
+        # GeM search can also return reverse-auction records such as
+        # GEM/2026/R/123456. Those do not use the normal bid PDF document
+        # endpoint reliably; many return HTTP 200 with an empty body. This
+        # pipeline stores bid records only, so keep only GEM/.../B/... here.
+        if "/B/" not in str(bid_number):
+            continue
+
         # ----------------------------------------------------
         # ITEM / CATEGORY
         # ----------------------------------------------------

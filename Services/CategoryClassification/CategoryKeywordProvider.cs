@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace GemBidScraper.Services.CategoryClassification;
 
@@ -59,16 +59,18 @@ public static class CategoryKeywordProvider
                     DisplayName = "Operating Systems & Virtualization",
                     Keywords = new List<string>
                     {
-                        "operating system", "os", "windows 10", "windows 11", "windows server", "windows server 2019",
-                        "windows server 2022", "linux server", "ubuntu server", "red hat enterprise linux", "red hat", "redhat",
-                        "rhel", "centos", "rocky linux", "alma linux", "debian", "suse linux", "opensuse", "fedora", "arch linux",
-                        "freebsd", "openbsd", "macos", "mac os", "unix", "solaris", "aix", "android os", "chromeos", "rtos", "vxworks",
-                        "server os", "desktop os", "server migration", "os migration", "os upgrade", "server deployment",
-                        "server administration", "system administration", "patch management", "endpoint management",
-                        "active directory", "group policy", "domain controller", "hypervisor", "virtualization", "vmware",
-                        "vmware esxi", "vmware vsphere", "hyper-v", "proxmox", "kvm virtualization", "xen", "xenserver",
+                        "operating system", "os", "windows server", "linux server", "ubuntu server",
+                        "red hat enterprise linux", "rhel", "centos", "debian", "suse linux",
+                        "server os", "desktop os", "windows 10", "windows 11", "server migration",
+                        "os migration", "os upgrade", "server deployment", "server administration",
+                        "system administration", "patch management", "endpoint management",
+                        "active directory", "group policy", "domain controller",
+                        "windows server 2019", "windows server 2022", "red hat", "redhat",
+                        "rocky linux", "alma linux", "opensuse", "fedora", "arch linux",
+                        "freebsd", "openbsd", "macos", "mac os", "unix", "solaris", "aix",
+                        "hypervisor", "virtualization", "vmware", "vmware esxi", "vmware vsphere",
+                        "hyper-v", "proxmox", "kvm virtualization", "xen", "xenserver",
                         "citrix hypervisor", "nutanix ahv"
-
                     }
                 },
 
@@ -83,7 +85,6 @@ public static class CategoryKeywordProvider
                         "cross platform app", "web site development", "portal customization", "custom web app", "intranet portal",
                         "extranet portal", "micro-site", "landing page", "content portal", "citizen portal", "e-services portal",
                         "payment gateway integration", "rest api development"
-
                     }
                 },
 
@@ -93,18 +94,14 @@ public static class CategoryKeywordProvider
                     DisplayName = "Programming Languages & Frameworks",
                     Keywords = new List<string>
                     {
-                        "c#", "csharp", "c++", "c language", "java", "python", "javascript", "typescript", "php", "ruby", "swift",
-                        "kotlin", "go", "golang", "rust", "r language", "scala", "perl", "dart", "haskell", "lua", "assembly", "bash",
-                        "powershell", "shell script", "vb.net", "visual basic", "cobol", "fortran", "elixir", "erlang", "clojure",
-                        "groovy", "zig", "node.js", "nodejs", "deno", "bun", "python3", "jdk", "jre", ".net framework", ".net core",
-                        ".net 6", ".net 7", ".net 8", ".net 9", "react", "react native", "angular", "vue.js", "vuejs", "next.js",
-                        "nuxt.js", "express.js", "nest.js", "django", "fastapi", "spring boot", "laravel", "symfony", "codeigniter",
-                        "asp.net", "asp.net mvc", "blazor", "ruby on rails", "flutter", "ionic", "cordova", "xamarin", "maui",
-                        "bootstrap", "tailwind css", "jquery", "svelte", "astro", "solidjs", "pytorch", "tensorflow", "keras",
-                        "scikit-learn", "opencv", "pandas", "numpy", "spacy", "nltk", "huggingface", "transformers", "langchain",
-                        "llama-index", "jax", "scipy", "xgboost"
-
-
+                        "c# programming", "csharp", "c++ programming", "c language", "java programming", "python programming",
+                        "javascript", "typescript", "php language", "ruby programming", "swift programming",
+                        "kotlin", "golang", "rust programming", "r language", "scala programming", "perl script",
+                        "haskell", "powershell script", "shell script", "bash script", "visual basic", "vb.net",
+                        "node.js", "nodejs", "deno", "bun", "python3", "jdk", "jre", ".net framework", ".net core",
+                        ".net 6", ".net 7", ".net 8", ".net 9", "react framework", "react native", "angular framework", "vue.js",
+                        "next.js", "express.js", "nest.js", "django framework", "fastapi framework", "spring boot",
+                        "asp.net core", "asp.net mvc", "flutter app", "pytorch", "tensorflow"
                     }
                 },
 
@@ -114,12 +111,11 @@ public static class CategoryKeywordProvider
                     DisplayName = "Developer Tools & DevOps",
                     Keywords = new List<string>
                     {
-                        "software development kit", "sdk", "ide", "visual studio", "vscode", "intellij", "eclipse", "pycharm", "git",
+                        "software development kit", "sdk", "ide", "visual studio", "vscode", "intellij", "eclipse", "pycharm",
                         "github", "gitlab", "bitbucket", "ci/cd", "jenkins", "github actions", "gitlab ci", "azure devops", "docker",
                         "kubernetes", "k8s", "containerization", "helm", "rancher", "podman", "terraform", "ansible", "puppet", "chef",
                         "vagrant", "maven", "gradle", "npm", "yarn", "pip", "nuget", "sonarqube", "artifactory", "nexus", "postman",
                         "swagger", "openapi"
-
                     }
                 },
 
@@ -129,16 +125,12 @@ public static class CategoryKeywordProvider
                     DisplayName = "Databases & DBMS Systems",
                     Keywords = new List<string>
                     {
-                        "rdbms", "database", "dbms", "relational database", "sql server", "ms sql", "microsoft sql server", "oracle",
-                        "oracle database", "oracle 19c", "oracle 21c", "edb", "enterprisedb", "enterprise db", "enterprisedb postgres",
+                        "rdbms", "database", "dbms", "relational database", "sql server", "ms sql", "microsoft sql server", "oracle database",
+                        "oracle 19c", "oracle 21c", "enterprisedb", "enterprise db", "enterprisedb postgres",
                         "postgresql", "postgres", "mysql", "mariadb", "sqlite", "ibm db2", "db2", "cockroachdb", "tidb", "amazon rds",
-                        "azure sql", "cloud spanner", "nosql", "nosql database", "mongodb", "couchdb", "couchbase", "documentdb",
-                        "ravendb", "rethinkdb", "orientdb", "firestore", "dynamodb", "redis", "redis cluster", "memcached",
-                        "dragonflydb", "keydb", "aerospike", "vector database", "milvus", "pinecone", "qdrant", "weaviate", "chromadb",
-                        "neo4j", "arangodb", "amazon neptune", "influxdb", "timescaledb", "questdb", "elasticsearch", "opensearch",
-                        "solr", "clickhouse", "snowflake", "databricks", "apache hive", "amazon redshift", "google bigquery", "duckdb",
-                        "trino", "presto"
-
+                        "azure sql", "cloud spanner", "nosql database", "mongodb", "couchdb", "couchbase", "documentdb",
+                        "dynamodb", "redis", "redis cluster", "memcached", "elasticsearch", "opensearch",
+                        "clickhouse", "snowflake", "databricks", "amazon redshift", "google bigquery"
                     }
                 },
 
@@ -150,10 +142,9 @@ public static class CategoryKeywordProvider
                     {
                         "microsoft exchange server", "exchange server", "exchange online", "microsoft 365", "office 365",
                         "email server", "mail server", "email migration", "exchange migration", "office 365 migration",
-                        "microsoft 365 migration", "exchange server upgrade", "exchange server support", "exchange server migration",
-                        "email infrastructure", "enterprise email", "email backup", "email archiving", "email disaster recovery",
+                        "microsoft 365 migration", "exchange server upgrade", "exchange server support", "email infrastructure",
+                        "enterprise email", "email security", "email backup", "email archiving", "email disaster recovery",
                         "hybrid exchange", "exchange hybrid", "smtp server", "imap", "pop3", "mailbox migration", "email hosting"
-
                     }
                 },
 
@@ -165,11 +156,10 @@ public static class CategoryKeywordProvider
                     {
                         "business email", "enterprise email solutions", "corporate email", "email management",
                         "email security solutions", "secure email gateway", "email protection", "anti-spam", "anti-phishing",
-                        "email filtering", "email recovery", "cloud email", "email continuity", "mail security", "secure mail",
-                        "email compliance", "email data loss prevention", "microsoft 365 email", "google workspace",
-                        "gmail for business"
-
-
+                        "email filtering", "email archiving", "email backup", "email recovery", "email hosting",
+                        "cloud email", "email migration", "email continuity", "email disaster recovery",
+                        "mail security", "secure mail", "email compliance", "email data loss prevention",
+                        "dlp", "microsoft 365 email", "google workspace", "gmail for business"
                     }
                 },
 
@@ -179,13 +169,13 @@ public static class CategoryKeywordProvider
                     DisplayName = "Firewall & Network Security",
                     Keywords = new List<string>
                     {
-                        "firewall", "next generation firewall", "next-gen firewall", "ngfw", "network firewall", "enterprise firewall",
+                        "firewall", "next generation firewall", "ngfw", "network firewall", "enterprise firewall",
                         "hardware firewall", "software firewall", "cloud firewall", "firewall security", "firewall management",
-                        "firewall migration", "firewall upgrade", "firewall replacement", "firewall configuration",
-                        "firewall monitoring", "firewall support", "network security", "cybersecurity", "utm",
-                        "unified threat management", "intrusion prevention system", "intrusion detection system", "ips", "ids", "vpn",
-                        "ssl vpn", "site-to-site vpn", "zero trust", "network access control", "secure web gateway"
-
+                        "firewall migration", "firewall upgrade", "firewall configuration", "firewall monitoring",
+                        "firewall support", "network security", "cybersecurity", "utm", "unified threat management",
+                        "intrusion prevention system", "ips", "intrusion detection system", "ids", "vpn",
+                        "ssl vpn", "site-to-site vpn", "zero trust", "network access control", "secure web gateway",
+                        "palo alto firewall", "fortinet firewall", "fortigate firewall", "sophos firewall", "cisco firewall", "checkpoint firewall"
                     }
                 },
 
@@ -196,22 +186,12 @@ public static class CategoryKeywordProvider
                     Keywords = new List<string>
                     {
                         "enterprise software", "business software", "custom software", "software development",
-                        "application development", "enterprise applications", "business applications", "erp", "crm", "hrms", "scm",
-                        "dms", "workflow automation", "digital transformation", "software integration", "api integration",
-                        "application modernization", "legacy application modernization", "software migration", "application support",
-                        "managed software services", "it software solutions", "software license", "enterprise it solutions",
-                        "it infrastructure modernization", "it infrastructure upgrade", "saas", "office suite", "software maintenance",
-                        "middleware", "bi tool", "business intelligence", "cms", "content management system",
-                        "document management system", "lms", "learning management system", "human resource management system",
-                        "gis software", "matlab", "digital e-learning software", "designing software", "global mapper",
-                        "accessibility software", "digitization", "digitisation", "sap", "sap hana", "oracle ebs", "oracle fusion",
-                        "microsoft dynamics", "salesforce", "zoho", "odoo", "tally", "tally prime", "workday", "servicenow", "zendesk",
-                        "jira", "confluence", "sharepoint", "power bi", "tableau", "qlikview", "looker", "grafana", "kibana",
-                        "autocad", "solidworks", "revit", "ansys", "arcgis", "qgis", "photoshop", "illustrator", "indesign",
-                        "adobe premiere", "coreldraw", "maya", "3ds max", "blender", "unity", "unreal engine", "labview", "spss",
-                        "stata", "minitab", "simulink", "scada software", "plc programming", "ocr software", "abbyy finefinder",
-                        "pdf editor", "adobe acrobat"
-
+                        "application development", "enterprise applications", "business applications", "erp", "crm",
+                        "hrms", "scm", "dms", "workflow automation", "digital transformation", "software integration",
+                        "api integration", "application modernization", "legacy application modernization",
+                        "software migration", "application support", "managed software services", "it software solutions",
+                        "sap", "sap hana", "oracle ebs", "oracle fusion", "microsoft dynamics", "salesforce",
+                        "zoho", "odoo", "tally", "tally prime", "workday", "servicenow", "power bi", "tableau"
                     }
                 },
 
@@ -224,24 +204,11 @@ public static class CategoryKeywordProvider
                         "router", "enterprise router", "network router", "core router", "edge router", "branch router",
                         "wireless router", "sd-wan", "sd-wan router", "network infrastructure", "network deployment",
                         "network upgrade", "router configuration", "router management", "router support", "network monitoring",
-                        "switch", "network switch", "l2 switch", "l3 switch", "wifi", "wireless", "wireless access point", "modem",
-                        "access point", "network cable", "patch panel", "leased line", "internet connectivity", "bandwidth", "lan",
-                        "wan", "wlan", "mpls", "internet gateway", "network gateway", "vpn router", "cisco router", "juniper router",
-                        "fortinet router", "huawei router", "mikrotik router", "network architecture", "cat6", "fiber optic", "ofc",
-                        "sfp module", "media converter", "fibre media converter", "patch cord", "crimping", "structured cabling",
-                        "wi-fi controller", "dhcp server", "dns", "load balancer", "voip", "ip phone", "networking trainer",
-                        "joint enclosure", "network attached storage device", "network card", "managed switch", "unmanaged switch",
-                        "poe switch", "poe injector", "poe splitter", "cat5e", "cat6a", "cat7", "cat8", "single mode fiber",
-                        "multi mode fiber", "armored fiber cable", "fiber patch cord", "splice tray", "fiber closure", "pigtail",
-                        "sfp+", "qsfp", "qsfp28", "10gbe switch", "40gbe switch", "100gbe switch", "network interface card", "nic",
-                        "hba card", "host bus adapter", "gateway", "cellular router", "4g router", "5g router", "ill",
-                        "internet leased line", "ftth", "gpon", "epon", "onu", "olt", "wi-fi 6", "wi-fi 6e", "wi-fi 7", "mesh router",
-                        "outdoor access point", "directional antenna", "omni antenna", "attenuator", "optical power meter",
-                        "fusion splicer", "otdr cable", "network tap", "packet broker", "dns server", "radius server", "tacacs+",
-                        "vlan", "mpls router", "core switch", "distribution switch", "access switch", "chassis switch",
-                        "terminal server", "console server", "modem router", "vdsl modem", "walkie talkie", "walkie talkies",
-                        "handheld transceiver", "pmr446", "radio set", "radio sets", "digital uhf hand-held radio", "transceiver"
-
+                        "lan", "wan", "wlan", "mpls", "internet gateway", "network gateway", "vpn router",
+                        "cisco router", "juniper router", "fortinet router", "huawei router", "mikrotik router",
+                        "network security", "network architecture", "network switch", "l2 switch", "l3 switch",
+                        "managed switch", "poe switch", "core switch", "distribution switch", "access switch",
+                        "patch panel", "structured cabling", "sfp module", "transceiver"
                     }
                 },
 
@@ -251,16 +218,12 @@ public static class CategoryKeywordProvider
                     DisplayName = "Storage & Disaster Recovery",
                     Keywords = new List<string>
                     {
-                        "nas", "san", "storage", "storage array", "backup", "backup solution", "data backup", "tape drive",
-                        "cloud storage", "raid storage", "nvme", "iscsi", "fibre channel", "fc storage", "object storage",
+                        "nas storage", "san storage", "storage array", "storage server", "data storage", "cloud storage",
+                        "raid storage", "nvme storage", "iscsi storage", "fibre channel storage", "fc storage", "object storage",
                         "disaster recovery", "dr storage", "network attached storage", "storage area network", "lto tape",
-                        "all-flash array", "hybrid storage", "unified storage", "das", "direct attached storage", "lto-7", "lto-8",
-                        "lto-9", "tape library", "autoloader", "tape cartridge", "disk enclosure", "jbod", "raid controller",
-                        "sas hard drive", "nearline sas", "sata hard drive", "enterprise ssd", "nvme-of", "s3 compatible storage",
-                        "immutable storage", "air-gapped backup", "deduplication appliance", "replication", "storage snapshot",
-                        "block storage", "file storage", "cold storage", "archive storage", "storage enclosure", "san switch",
-                        "fc switch", "multipathing", "thin provisioning"
-
+                        "all-flash array", "hybrid storage", "unified storage", "tape library", "autoloader", "tape cartridge",
+                        "disk enclosure", "jbod", "raid controller", "enterprise ssd", "immutable storage", "air-gapped backup",
+                        "deduplication appliance", "storage snapshot", "block storage", "file storage", "san switch"
                     }
                 },
 
@@ -354,16 +317,15 @@ public static class CategoryKeywordProvider
                     DisplayName = "IT Support & Managed Services",
                     Keywords = new List<string>
                     {
-                        "amc", "annual maintenance contract", "installation", "maintenance", "repair", "configuration", "it support",
-                        "helpdesk", "system integration", "data migration", "it consultancy", "managed services", "fms", "it resource",
-                        "sla based service", "hardware replacement", "debugging", "troubleshooting", "it maint", "it spares",
-                        "software development services", "portal development", "ui/ux design", "cloud migration services",
+                        "it amc", "it annual maintenance contract", "it installation", "it maintenance", "it repair", "it configuration",
+                        "it support", "it helpdesk", "system integration", "data migration", "it consultancy", "managed it services",
+                        "it facility management", "fms", "it resource", "sla based service", "it hardware replacement", "it troubleshooting",
+                        "it maint", "it spares", "software development services", "portal development", "cloud migration services",
                         "devops services", "database administration", "dba services", "network management", "soc management",
                         "managed security service provider", "mssp", "it audit", "vapt audit", "cert-in audit",
-                        "data center colocation", "data entry services", "digitization service", "scanning and indexing",
-                        "manpower for it", "it manpower", "software testing", "qa testing", "performance testing", "security testing",
-                        "amc of cctv", "amc of ups", "amc of servers", "amc of computers", "onsite support", "remote support",
-                        "software support", "it project", "hiring of agency for it"
+                        "data center colocation", "digitization service", "scanning and indexing", "it manpower",
+                        "software testing", "amc of cctv", "amc of ups", "amc of servers", "amc of computers", "onsite it support",
+                        "remote it support", "software support", "hiring of agency for it"
 
 
 
@@ -406,8 +368,9 @@ public static class CategoryKeywordProvider
                         "shooting range", "ammunition", "amn bunker", "weapon training chart", "pneumatic gun",
                         "ir make pneumatic gun", "lead shots", "cartridge", "arms issue register", "ordnance", "ord spares",
                         "ord stores", "small arms", "rifle", "pistol", "carbine", "mortar", "artillery", "grenade", "pyrotechnics",
-                        "bullet proof jacket", "firing target", "target retriever system", "bullet trap"
-
+                        "bullet proof jacket", "firing target", "target retriever system", "bullet trap",
+                        "star plate", "procurement of star plates", "star plate for ids", "star plate for cds", "star plate for cas",
+                        "star plate air marshal", "star plate air vice marshal", "star plate air commodore", "military insignia", "rank badge"
                     }
                 },
 
@@ -417,7 +380,8 @@ public static class CategoryKeywordProvider
                     DisplayName = "Military Vehicles & Shelters",
                     Keywords = new List<string>
                     {
-                        "tatra 815", "swaraj mazda amb", "tata amb", "recovery vehicle", "all terrain tactical hauler",
+                        "tatra 815", "beml tatra", "tatra vehicle", "amc of beml tatra vehicle", "amc of tatra vehicle", "amc of tatra",
+                        "swaraj mazda amb", "tata amb", "recovery vehicle", "all terrain tactical hauler",
                         "all terrain vehicle", "troop carrier", "mobile spares shelter", "field shelter", "office shelter",
                         "living shelter", "vehicle chassis", "lpta", "armoured vehicle", "bullet proof vehicle",
                         "mine protected vehicle", "infantry combat vehicle", "bvp", "als truck", "tactical vehicle",
@@ -602,8 +566,10 @@ public static class CategoryKeywordProvider
                         "lower arm", "front stabilizer link", "u joint", "universal joint", "uj cross", "cover outer",
                         "engine alignment tool", "wheel alignment", "alternator", "turbocharger", "leaf spring", "steering rack",
                         "ball joint", "headlight assy", "tail light", "brake master cylinder", "clutch master cylinder",
-                        "silencer pipe", "catalytic converter", "obd", "on-board diagnostics", "hand brake", "door lock"
-
+                        "silencer pipe", "catalytic converter", "obd", "on-board diagnostics", "hand brake", "door lock",
+                        "storage battery", "lead storage battery", "lead acid storage battery", "shim", "lock washer",
+                        "clutch withdrawal", "door glass channel", "needle roller bearings", "pin low speed select guide",
+                        "oem spares for automobiles", "lv7-tata", "lv7", "tata shim", "automobile spares", "vehicle spares"
                     }
                 },
 
@@ -1233,9 +1199,9 @@ public static class CategoryKeywordProvider
                         "thermal silicon adhesive", "paint rfu", "primer", "hydrochloric acid", "sulfuric acid", "caustic soda",
                         "alum", "polyaluminium chloride", "enamel paint", "epoxy paint", "emulsion paint", "thinner solvent",
                         "distilled water", "smoke grey paint", "potassium nitrate", "nitroguanidine", "picrite", "marine fuel",
-                        "furnace oil", "diesel fuel", "aviation fuel"
-
-
+                        "furnace oil", "diesel fuel", "aviation fuel", "refrigerant gas", "freon gas", "freon gas r-404",
+                        "freon gas r 404", "freon", "r-404", "r 404", "chlorodifluoro methane", "chlorodifluoromethane",
+                        "refrigerant", "r134a", "r-134a", "r22", "r-22", "r410a", "r-410a", "r32", "r-32", "industrial gas"
                     }
                 }
             }

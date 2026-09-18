@@ -1,4 +1,4 @@
-﻿using GemBidScraper.Services;
+using GemBidScraper.Services;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
@@ -48,6 +48,31 @@ namespace GemBidScraper.Controllers
                     TotalRecords = bids.Count,
                     Data = bids
                 });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    Success = false,
+                    Error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Re-runs category classification for bids already stored in the database.
+        /// Useful when keywords or classification rules are updated.
+        /// Supports optional `take` parameter (e.g. ?take=500) or `bidNumber` (e.g. ?bidNumber=GEM/2026/B/8038742).
+        /// </summary>
+        [HttpPost("reclassify")]
+        public async Task<IActionResult> Reclassify(
+            [FromQuery] int? take = null,
+            [FromQuery] string? bidNumber = null)
+        {
+            try
+            {
+                var result = await _pythonParserService.ReclassifyBidsAsync(take, bidNumber);
+                return Ok(result);
             }
             catch (Exception ex)
             {

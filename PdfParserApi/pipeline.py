@@ -204,6 +204,11 @@ def _classify_bids(
 
         bid_number = bid.get("bid_number")
 
+        if bid_number and "/B/" not in str(bid_number):
+            bid["_change_type"] = "skipped_reverse_auction"
+            unchanged_bids.append(bid)
+            continue
+
         # ----------------------------------------------------
         # Missing BidNumber
         #
