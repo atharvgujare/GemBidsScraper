@@ -60,6 +60,19 @@ class OnlinePdfRequest(BaseModel):
     )
 
 
+class RescrapeLocationItem(BaseModel):
+    Id: int = Field(..., alias="id")
+    PdfUrl: str = Field(..., alias="pdfUrl")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class RescrapeLocationRequest(BaseModel):
+    Bids: list[RescrapeLocationItem] = Field(..., alias="bids")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class PageRequest(BaseModel):
 
     Pages: int = Field(
@@ -464,6 +477,44 @@ def set_schedule(
         "schedule_times":
             request.Times,
     }
+
+
+# ============================================================
+# RESCRAPE CONSIGNEE LOCATIONS
+# ============================================================
+
+@app.post("/rescrape-consignee-locations")
+def rescrape_consignee_locations(
+    request: RescrapeLocationRequest
+):
+    import urllib.request
+    import concurrent.futures
+    from consignee_extractor import extract_consignee_location_from_bytes
+
+    def fetch_and_extract(bid):
+        try:
+            req_obj = urllib.request.Request(
+                bid.PdfUrl,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            )
+            with urllib.request.urlopen(req_obj, timeout=20) as response:
+                pdf_bytes = response.read()
+                info = extract_consignee_location_from_bytes(pdf_bytes)
+                return {
+                    "id": bid.Id,
+                    "location": info.get("location"),
+                    "consignee_name": info.get("consignee_name")
+                }
+        except Exception as e:
+            return {"id": bid.Id, "location": None, "error": str(e)}
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=40) as executor:
+        futures = [executor.submit(fetch_and_extract, b) for b in request.Bids]
+        for f in concurrent.futures.as_completed(futures):
+            results.append(f.result())
+
+    return {"results": results}
 
 
 # ============================================================

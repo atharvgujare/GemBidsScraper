@@ -103,5 +103,49 @@ namespace GemBidScraper.Controllers
                 });
             }
         }
+
+        /// <summary>
+        /// Backfills the Location column for existing database records based on ConsigneeAddress and OfficeName.
+        /// Optional `take` parameter (e.g. ?take=1000).
+        /// </summary>
+        [HttpPost("backfill-locations")]
+        public async Task<IActionResult> BackfillLocations([FromQuery] int? take = null)
+        {
+            try
+            {
+                var result = await _pythonParserService.BackfillLocationsAsync(take);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    Success = false,
+                    Error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Rescrapes specifically the Consignees/Reporting Officer table for existing bids where Location is NULL.
+        /// Updates ONLY the Location column in the database, keeping everything else 100% untouched.
+        /// </summary>
+        [HttpPost("rescrape-consignee-locations")]
+        public async Task<IActionResult> RescrapeConsigneeLocations([FromQuery] int batchSize = 100, [FromQuery] int skip = 0)
+        {
+            try
+            {
+                var result = await _pythonParserService.RescrapeConsigneeLocationsAsync(batchSize, skip);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    Success = false,
+                    Error = ex.Message
+                });
+            }
+        }
     }
 }

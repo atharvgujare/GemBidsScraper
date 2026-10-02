@@ -56,6 +56,7 @@ CANONICAL_KEY_PATTERNS = [
     ("Consignee Name", ["consignee name", "consignee reporting/officer"]),
     ("Consignee Address", ["consignee address", "delivery address"]),
     ("Consignee Quantity", ["consignee quantity"]),
+    ("Location", ["location", "city", "delivery location", "delivery city"]),
 ]
 
 
@@ -141,32 +142,78 @@ def add(result, key, value):
 
 
 def merge_tables(result, tables):
+    has_valid_consignee = False
+
     for table in tables:
         if not table:
             continue
+
+        # Check if this table is the Consignees / Reporting Officer and Quantity section
+        is_consignee_table = False
+        addr_col_idx = 2
+        name_col_idx = 1
+        qty_col_idx = 3
+
+        for row_raw in table:
+            row_str = " ".join([str(c).lower() for c in row_raw if c])
+            if "consignee" in row_str or "reporting/officer" in row_str or "परेषिती" in row_str:
+                is_consignee_table = True
+                for idx, cell in enumerate(row_raw):
+                    if not cell:
+                        continue
+                    c_low = str(cell).lower()
+                    if "address" in c_low or "पता" in c_low:
+                        addr_col_idx = idx
+                    elif "reporting" in c_low or "officer" in c_low:
+                        name_col_idx = idx
+                    elif "quant" in c_low or "मात्रा" in c_low:
+                        qty_col_idx = idx
+                break
 
         for row in table:
             if not row:
                 continue
 
-            row = [clean(str(cell)) for cell in row if cell]
-            if not row:
-                continue
-            if len(row) < 2:
+            if is_consignee_table:
+                first_cell = clean(str(row[0])) if len(row) > 0 and row[0] else ""
+                # Match row 1, 2, etc.
+                if first_cell == "1" or (first_cell.isdigit() and int(first_cell) <= 10):
+                    if len(row) > name_col_idx and row[name_col_idx]:
+                        c_name = clean(str(row[name_col_idx]))
+                        if c_name and not c_name.isdigit():
+                            result["Consignee Name"] = c_name
+
+                    if len(row) > addr_col_idx and row[addr_col_idx]:
+                        c_addr = clean(str(row[addr_col_idx]))
+                        if c_addr and not any(kw in c_addr.lower() for kw in ["delivery schedule", "prarambh", "number of days"]):
+                            result["Consignee Address"] = c_addr
+                            has_valid_consignee = True
+
+                    if len(row) > qty_col_idx and row[qty_col_idx]:
+                        c_qty = clean(str(row[qty_col_idx]))
+                        if c_qty and any(c.isdigit() for c in c_qty):
+                            result["Consignee Quantity"] = c_qty
+                    continue
+
+            # Fallback row cleaning for general 2-column or 3-column tables
+            cleaned_row = [clean(str(cell)) for cell in row if cell]
+            if not cleaned_row or len(cleaned_row) < 2:
                 continue
 
-            if len(row) >= 5 and "consignee" in row[1].lower():
+            if len(cleaned_row) >= 5 and "consignee" in cleaned_row[1].lower():
                 continue
 
-            if len(row) > 0 and row[0].isdigit():
-                if len(row) > 1:
-                    result["Consignee Name"] = row[1]
-                if len(row) > 2 and any(c.isalpha() for c in row[2]):
-                    result["Consignee Address"] = row[2]
-                if len(row) > 3 and row[3].replace(",", "").isdigit():
-                    result["Consignee Quantity"] = row[3]
-                if len(row) > 4 and (row[4].replace(",", "").isdigit() or row[4].upper() == "N/A"):
-                    result["Delivery Days"] = row[4]
+            # Only fallback to digit-starting row if consignee was not already cleanly found
+            if not has_valid_consignee and len(cleaned_row) > 0 and cleaned_row[0].isdigit():
+                if len(cleaned_row) > 1 and not cleaned_row[1].isdigit():
+                    result["Consignee Name"] = cleaned_row[1]
+                if len(cleaned_row) > 2 and any(c.isalpha() for c in cleaned_row[2]) and not any(kw in cleaned_row[2].lower() for kw in ["delivery schedule", "prarambh"]):
+                    result["Consignee Address"] = cleaned_row[2]
+                    has_valid_consignee = True
+                if len(cleaned_row) > 3 and cleaned_row[3].replace(",", "").isdigit():
+                    result["Consignee Quantity"] = cleaned_row[3]
+                if len(cleaned_row) > 4 and (cleaned_row[4].replace(",", "").isdigit() or cleaned_row[4].upper() == "N/A"):
+                    result["Delivery Days"] = cleaned_row[4]
                 continue
 
             if len(row) == 3:
@@ -285,4 +332,22 @@ def build_json(extracted, records):
     merge_text(result, extracted["RawText"])
     extract_important_fields(result, extracted["RawText"])
     add_common_fields(result)
+
+    # Resolve standardized city name for Location
+    try:
+        from city_resolver import resolve_location
+        resolved_city = resolve_location(
+            consignee_address=result.get("Consignee Address"),
+            consignee_name=result.get("Consignee Name"),
+            event_premises=result.get("Event premises") or result.get("Place of Delivery") or result.get("Location of event"),
+            office_name=result.get("Office Name"),
+            zipcode=result.get("Drop Location Zipcode") or result.get("Start Location Zipcode") or result.get("pincode"),
+            beneficiary=result.get("Beneficiary") or result.get("लाभार्थी /Beneficiary"),
+            atc_text=extracted.get("RawText")
+        )
+        if resolved_city:
+            result["Location"] = resolved_city
+    except Exception:
+        pass
+
     return result

@@ -1255,5 +1255,190 @@ namespace GemBidScraper.Services
                 SampleUpdatedBids = updatedBids
             };
         }
+
+        /// <summary>
+        /// Backfills the Location column for existing records using ConsigneeAddress and OfficeName.
+        /// </summary>
+        public async Task<object> BackfillLocationsAsync(int? take = null)
+        {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            var query = _context.GeMBidExtracts
+                .Where(x => string.IsNullOrWhiteSpace(x.Location) &&
+                           (!string.IsNullOrWhiteSpace(x.ConsigneeAddress) || !string.IsNullOrWhiteSpace(x.OfficeName)))
+                .OrderByDescending(x => x.Id)
+                .Select(x => new { x.Id, x.BidNumber, x.ConsigneeAddress, x.OfficeName })
+                .AsQueryable();
+
+            if (take.HasValue && take.Value > 0)
+            {
+                query = query.Take(take.Value);
+            }
+
+            var bids = await query.ToListAsync();
+            int totalProcessed = bids.Count;
+            int totalUpdated = 0;
+            var sampleUpdates = new List<object>();
+            var updateBatch = new List<(int Id, string Location)>();
+
+            foreach (var bid in bids)
+            {
+                var city = GeMBIdMapper.GeMBidMapper_2.ResolveCity(bid.ConsigneeAddress)
+                        ?? GeMBIdMapper.GeMBidMapper_2.ResolveCity(bid.OfficeName);
+
+                if (!string.IsNullOrWhiteSpace(city))
+                {
+                    updateBatch.Add((bid.Id, city));
+                    totalUpdated++;
+
+                    if (sampleUpdates.Count < 10)
+                    {
+                        sampleUpdates.Add(new
+                        {
+                            id = bid.Id,
+                            bidNumber = bid.BidNumber,
+                            location = city
+                        });
+                    }
+                }
+            }
+
+            // High-speed chunked SQL batch execution (500 per round-trip)
+            for (int i = 0; i < updateBatch.Count; i += 500)
+            {
+                var chunk = updateBatch.Skip(i).Take(500).ToList();
+                var sb = new System.Text.StringBuilder();
+                var nowStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                foreach (var item in chunk)
+                {
+                    var locEscaped = item.Location.Replace("'", "''");
+                    sb.Append($"UPDATE [dbo].[GeMBidExtracts] SET [Location] = '{locEscaped}', [UpdatedOn] = '{nowStr}' WHERE [Id] = {item.Id}; ");
+                }
+                if (sb.Length > 0)
+                {
+                    await _context.Database.ExecuteSqlRawAsync(sb.ToString());
+                }
+            }
+
+            stopwatch.Stop();
+
+            return new
+            {
+                Success = true,
+                TotalFound = totalProcessed,
+                TotalUpdated = totalUpdated,
+                SkippedOrUnresolved = totalProcessed - totalUpdated,
+                Elapsed = $"{stopwatch.Elapsed:hh\\:mm\\:ss\\.fff}",
+                SampleUpdates = sampleUpdates
+            };
+        }
+
+        /// <summary>
+        /// Rescrapes specifically the Consignees/Reporting Officer table for existing bids where Location is NULL.
+        /// Updates ONLY the Location column in the database, keeping everything else 100% untouched.
+        /// </summary>
+        public async Task<object> RescrapeConsigneeLocationsAsync(int batchSize = 100, int skip = 0)
+        {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            var bids = await _context.GeMBidExtracts
+                .Where(x => string.IsNullOrWhiteSpace(x.Location) && !string.IsNullOrWhiteSpace(x.PdfUrl))
+                .OrderByDescending(x => x.Id)
+                .Skip(skip)
+                .Take(batchSize)
+                .Select(x => new { x.Id, x.BidNumber, x.PdfUrl })
+                .ToListAsync();
+
+            if (bids.Count == 0)
+            {
+                return new
+                {
+                    Success = true,
+                    Message = "No remaining bids found with Location IS NULL and valid PdfUrl.",
+                    TotalProcessed = 0,
+                    LocationsUpdated = 0
+                };
+            }
+
+            var requestPayload = new
+            {
+                bids = bids.Select(b => new { id = b.Id, pdfUrl = b.PdfUrl }).ToList()
+            };
+
+            var response = await _httpClient.PostAsJsonAsync("rescrape-consignee-locations", requestPayload);
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadFromJsonAsync<RescrapeLocationResponse>();
+            int updatedCount = 0;
+            var sampleUpdates = new List<object>();
+
+            if (result?.Results != null && result.Results.Count > 0)
+            {
+                var updateBatch = new List<(int Id, string Location)>();
+                foreach (var item in result.Results)
+                {
+                    if (!string.IsNullOrWhiteSpace(item.Location))
+                    {
+                        updateBatch.Add((item.Id, item.Location));
+                        updatedCount++;
+
+                        if (sampleUpdates.Count < 10)
+                        {
+                            var bidMatch = bids.FirstOrDefault(b => b.Id == item.Id);
+                            sampleUpdates.Add(new
+                            {
+                                id = item.Id,
+                                bidNumber = bidMatch?.BidNumber,
+                                location = item.Location
+                            });
+                        }
+                    }
+                }
+
+                // Batch SQL updates in chunks of 500
+                for (int i = 0; i < updateBatch.Count; i += 500)
+                {
+                    var chunk = updateBatch.Skip(i).Take(500).ToList();
+                    var sb = new System.Text.StringBuilder();
+                    var nowStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                    foreach (var item in chunk)
+                    {
+                        var locEscaped = item.Location.Replace("'", "''");
+                        sb.Append($"UPDATE [dbo].[GeMBidExtracts] SET [Location] = '{locEscaped}', [UpdatedOn] = '{nowStr}' WHERE [Id] = {item.Id}; ");
+                    }
+                    if (sb.Length > 0)
+                    {
+                        await _context.Database.ExecuteSqlRawAsync(sb.ToString());
+                    }
+                }
+            }
+
+            stopwatch.Stop();
+
+            return new
+            {
+                Success = true,
+                TotalProcessed = bids.Count,
+                LocationsUpdated = updatedCount,
+                SkippedOrUnresolved = bids.Count - updatedCount,
+                Elapsed = $"{stopwatch.Elapsed:hh\\:mm\\:ss\\.fff}",
+                SampleUpdates = sampleUpdates
+            };
+        }
+
+        private class RescrapeLocationResponse
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("results")]
+            public List<RescrapeLocationResultItem>? Results { get; set; }
+        }
+
+        private class RescrapeLocationResultItem
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("id")]
+            public int Id { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("location")]
+            public string? Location { get; set; }
+        }
     }
 }

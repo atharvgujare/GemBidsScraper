@@ -1,4 +1,4 @@
-﻿using GemBidScraper.Attributes;
+using GemBidScraper.Attributes;
 using System.Text.Json.Serialization;
 
 namespace GemBidScraper.Models
@@ -239,7 +239,7 @@ namespace GemBidScraper.Models
 
         public string? CategorySubKey { get; set; }
 
-       
+        public string? Location { get; set; }
 
     }
 }

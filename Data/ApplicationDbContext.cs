@@ -1,4 +1,4 @@
-﻿using GemBidScraper.Models;
+using GemBidScraper.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace GemBidScraper.Data
@@ -61,6 +61,7 @@ namespace GemBidScraper.Data
                 entity.Property(x => x.Ministry).HasMaxLength(450);
                 entity.Property(x => x.DepartmentName).HasMaxLength(450);
                 entity.Property(x => x.OrganisationName).HasMaxLength(450);
+                entity.Property(x => x.Location).HasMaxLength(255);
 
                 // Extended Single-Line / Medium Fields
                 entity.Property(x => x.CardMinistry).HasMaxLength(450);

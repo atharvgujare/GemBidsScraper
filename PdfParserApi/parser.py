@@ -15,6 +15,18 @@ def build_result(doc):
     records = merge_multiline_records(records)
     result = build_json(extracted, records)
 
+    try:
+        from consignee_extractor import extract_consignee_location_from_doc
+        consignee_info = extract_consignee_location_from_doc(doc)
+        if consignee_info.get("location") and not result.get("Location"):
+            result["Location"] = consignee_info.get("location")
+        if consignee_info.get("consignee_name") and not result.get("Consignee Name"):
+            result["Consignee Name"] = consignee_info.get("consignee_name")
+        if consignee_info.get("consignee_address") and not result.get("Consignee Address"):
+            result["Consignee Address"] = consignee_info.get("consignee_address")
+    except Exception:
+        pass
+
     if _VERBOSE:
         print(f"[Parser] Extracted {len(result)} JSON fields")
 
