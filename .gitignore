@@ -81,7 +81,3 @@ GemBidScraper.zip
 PdfParserApi/test_bid_7469542.pdf
 
 
-
-# Local application configuration / secrets
-appsettings.json
-appsettings.Development.json
